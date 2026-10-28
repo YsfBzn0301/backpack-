@@ -1,0 +1,20 @@
+/** Dark "tactical" Google Maps style matching the app palette. */
+export const DARK_MAP_STYLE: google.maps.MapTypeStyle[] = [
+  { elementType: 'geometry', stylers: [{ color: '#11161e' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8b949e' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0d1117' }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#2a323d' }] },
+  { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#6e7681' }] },
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#132019' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1f2630' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#161b22' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2a323d' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#b1bac4' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1a2029' }] },
+  { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#ff876b' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a1520' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3a4350' }] },
+]

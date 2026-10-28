@@ -1,0 +1,195 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+@theme {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'SF Pro Display', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', monospace;
+
+  /* Surfaces: deep charcoal / slate */
+  --color-ink-950: #090c11;
+  --color-ink-900: #0d1117;
+  --color-ink-850: #11161e;
+  --color-ink-800: #161b22;
+  --color-ink-700: #1f2630;
+  --color-ink-600: #2a323d;
+  --color-ink-500: #3a4350;
+
+  /* Text */
+  --color-fog-50: #f3f6f9;
+  --color-fog-100: #e6edf3;
+  --color-fog-300: #b1bac4;
+  --color-fog-400: #8b949e;
+  --color-fog-500: #6e7681;
+
+  /* Warm accent: ember / coral */
+  --color-ember-300: #ffa58f;
+  --color-ember-400: #ff876b;
+  --color-ember-500: #ff6b4a;
+  --color-ember-600: #e9512f;
+  --color-amber-glow: #ffb347;
+
+  /* Signals */
+  --color-moss-400: #5fd39a;
+  --color-sky-glow: #6cb6ff;
+  --color-alert-500: #ff4d5e;
+
+  --radius-card: 1.25rem;
+  --ease-snap: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    background: var(--color-ink-900);
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--color-ink-900);
+    color: var(--color-fog-100);
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  input,
+  textarea,
+  [data-selectable] {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  button {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ember-500);
+    outline-offset: 2px;
+  }
+}
+
+@utility glass {
+  background: color-mix(in oklab, var(--color-ink-800) 90%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid color-mix(in oklab, var(--color-fog-100) 8%, transparent);
+}
+
+@utility glass-strong {
+  background: color-mix(in oklab, var(--color-ink-850) 95%, transparent);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid color-mix(in oklab, var(--color-fog-100) 10%, transparent);
+}
+
+@utility card {
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--color-ink-800) 92%, white 2%), var(--color-ink-800));
+  border: 1px solid color-mix(in oklab, var(--color-fog-100) 7%, transparent);
+}
+
+@utility hairline {
+  border-color: color-mix(in oklab, var(--color-fog-100) 8%, transparent);
+}
+
+@utility safe-top {
+  padding-top: max(env(safe-area-inset-top), 0.75rem);
+}
+
+@utility safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Weather ambience */
+@keyframes rain-fall {
+  from {
+    transform: translate3d(0, -20%, 0);
+  }
+  to {
+    transform: translate3d(-12px, 120%, 0);
+  }
+}
+@keyframes snow-fall {
+  from {
+    transform: translate3d(0, -10%, 0);
+  }
+  to {
+    transform: translate3d(14px, 120%, 0);
+  }
+}
+@keyframes sun-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08);
+  }
+}
+@keyframes drift {
+  from {
+    transform: translateX(-30%);
+  }
+  to {
+    transform: translateX(130%);
+  }
+}
+@keyframes flash {
+  0%,
+  92%,
+  100% {
+    opacity: 0;
+  }
+  93%,
+  95% {
+    opacity: 0.5;
+  }
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
