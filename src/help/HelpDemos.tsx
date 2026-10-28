@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { DemoId } from './featuresRegistry'
 import { AGENT_COLOR, AGENT_NAMES } from '@/agents/host'
+import { QUOTES } from '@/data/quotes'
+import { settings } from '@/lib/settings'
 
 function useTick(ms: number, n: number) {
   const [i, setI] = useState(0)
@@ -38,7 +40,8 @@ function Weather() {
 }
 
 function QuoteDemo() {
-  const lines = ['“Not all who wander are lost.”', '“To travel is to live.”', '“Collect moments.”']
+  const lang = settings.use((st) => st.uiLang)
+  const lines = ['live', 'moments', 'wander'].map((id) => `“${QUOTES.find((q) => q.id === id)!.text[lang]}”`)
   const i = useTick(2200, lines.length)
   return (
     <Frame>

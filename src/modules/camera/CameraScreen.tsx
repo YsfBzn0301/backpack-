@@ -191,7 +191,7 @@ export function CameraScreen() {
                 ))}
               </div>
             )}
-            <AnimatePresence>{flash > 0 && <motion.div key={flash} className="absolute inset-0 bg-white" initial={{ opacity: 0.85 }} animate={{ opacity: 0 }} transition={{ duration: 0.35 }} />}</AnimatePresence>
+            <AnimatePresence>{flash > 0 && <motion.div key={flash} className="pointer-events-none absolute inset-0 bg-white" initial={{ opacity: 0.85 }} animate={{ opacity: 0 }} transition={{ duration: 0.35 }} />}</AnimatePresence>
 
             {status !== 'live' && (
               <div className="absolute inset-0 grid place-items-center p-8 text-center">

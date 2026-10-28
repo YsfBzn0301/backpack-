@@ -22,6 +22,11 @@ export function Waveform({ levels, active, color = '#ff6b4a' }: { levels: React.
       const bars = 36
       const gap = 3
       const bw = (w - gap * (bars - 1)) / bars
+      // Not laid out yet (or too narrow): try again next frame.
+      if (bw <= 0.5) {
+        raf = requestAnimationFrame(draw)
+        return
+      }
       const data = levels.current
       const t = (performance.now() - start) / 1000
       for (let i = 0; i < bars; i++) {
