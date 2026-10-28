@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import type { Track } from '@/services/audio'
 
 /** Framer Motion 3D fallback for devices without WebGL. */
-export function CoverFlowCSS({ tracks, active, onChange }: { tracks: Track[]; active: number; onChange: (i: number) => void }) {
+export function CoverFlowCSS({ tracks, active, onChange, onOpen }: { tracks: Track[]; active: number; onChange: (i: number) => void; onOpen?: (i: number) => void }) {
   return (
     <motion.div
       className="relative h-64 w-full overflow-hidden"
@@ -20,7 +20,7 @@ export function CoverFlowCSS({ tracks, active, onChange }: { tracks: Track[]; ac
         return (
           <motion.button
             key={t.id}
-            onClick={() => onChange(i)}
+            onClick={() => (i === active && onOpen ? onOpen(i) : onChange(i))}
             className="absolute top-6 left-1/2 h-40 w-40 -ml-20 overflow-hidden rounded-xl shadow-2xl"
             animate={{ x: a < 1 ? d * 130 : Math.sign(d) * (130 + (a - 1) * 48), z: -Math.min(a, 1) * 120, rotateY: -Math.max(-1, Math.min(1, d)) * 60, opacity: a > 2.5 ? 0 : 1 }}
             transition={{ type: 'spring', stiffness: 260, damping: 30 }}

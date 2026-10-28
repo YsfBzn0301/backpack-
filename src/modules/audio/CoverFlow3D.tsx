@@ -136,7 +136,7 @@ function Rail({ tracks, target, onPick }: { tracks: Track[]; target: React.RefOb
   )
 }
 
-export function CoverFlow3D({ tracks, active, onChange }: { tracks: Track[]; active: number; onChange: (i: number) => void }) {
+export function CoverFlow3D({ tracks, active, onChange, onOpen }: { tracks: Track[]; active: number; onChange: (i: number) => void; onOpen?: (i: number) => void }) {
   const target = useRef(active)
   const drag = useRef<{ x: number; start: number; moved: boolean } | null>(null)
 
@@ -179,7 +179,16 @@ export function CoverFlow3D({ tracks, active, onChange }: { tracks: Track[]; act
       }}
     >
       <Canvas dpr={[1, 2]} camera={{ fov: 38, position: [0, 0.15, 4.6] }} gl={{ antialias: true, alpha: true }}>
-        <Rail tracks={tracks} target={target} onPick={(i) => !drag.current?.moved && onChange(i)} />
+        <Rail
+          tracks={tracks}
+          target={target}
+          onPick={(i) => {
+            if (drag.current?.moved) return
+            // Tapping the centred cover opens its details.
+            if (i === active && onOpen) onOpen(i)
+            else onChange(i)
+          }}
+        />
       </Canvas>
     </div>
   )

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 /** Canvas waveform. Mirrors mic levels into rounded bars; idles with a soft breathing line. */
-export function Waveform({ levels, active, color = '#ff6b4a' }: { levels: React.RefObject<Uint8Array>; active: boolean; color?: string }) {
+export function Waveform({ levels, active, color = '#ff6b4a', className = 'h-16 w-full' }: { levels: React.RefObject<Uint8Array>; active: boolean; color?: string; className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const c = ref.current
@@ -50,5 +50,5 @@ export function Waveform({ levels, active, color = '#ff6b4a' }: { levels: React.
     draw()
     return () => cancelAnimationFrame(raf)
   }, [levels, active, color])
-  return <canvas ref={ref} className="h-16 w-full" aria-hidden />
+  return <canvas ref={ref} className={className} aria-hidden />
 }

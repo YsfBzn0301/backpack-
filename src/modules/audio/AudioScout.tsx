@@ -4,7 +4,7 @@
  */
 import { AnimatePresence, motion } from 'framer-motion'
 import { AudioLines, ExternalLink, History, KeyRound, Loader2, Mic, Pause, Play, RotateCcw, Search } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AudioError, enrich, loadHistory, openMic, recognize, recordClip, saveHistory, searchTracks, spotifyUrl, TOKEN_CODES, type AudioErrorCode, type Track } from '@/services/audio'
 import { keys } from '@/lib/settings'
@@ -16,6 +16,8 @@ import { Waveform } from '@/modules/translate/Waveform'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 import { CoverFlow3D, hasWebGL } from './CoverFlow3D'
 import { CoverFlowCSS } from './CoverFlowCSS'
+import { TrackMatchModal } from './TrackMatchModal'
+import { usePreview } from './usePreview'
 
 type Phase = 'idle' | 'listening' | 'matching' | 'nomatch' | 'error'
 
@@ -23,80 +25,6 @@ const AUDD_DASHBOARD = 'https://dashboard.audd.io/'
 
 type AC = typeof AudioContext
 const AudioCtx = (): AC | undefined => (typeof window === 'undefined' ? undefined : (window.AudioContext ?? (window as unknown as { webkitAudioContext?: AC }).webkitAudioContext))
-
-/** Audio element + analyser for the live preview waveform. */
-function usePreview() {
-  const audio = useRef<HTMLAudioElement | null>(null)
-  const levels = useRef(new Uint8Array(64))
-  const ctx = useRef<{ ac: AudioContext; an: AnalyserNode } | null>(null)
-  const raf = useRef(0)
-  const [playing, setPlaying] = useState<string | null>(null)
-  const [progress, setProgress] = useState(0)
-
-  const stop = useCallback(() => {
-    audio.current?.pause()
-    cancelAnimationFrame(raf.current)
-    setPlaying(null)
-    setProgress(0)
-  }, [])
-
-  const play = useCallback(
-    async (t: Track) => {
-      if (!t.previewUrl) return
-      if (playing === t.id) return stop()
-      stop()
-      // A fresh element per track: createMediaElementSource binds once per element.
-      const el = new Audio()
-      el.crossOrigin = 'anonymous'
-      el.src = t.previewUrl
-      audio.current = el
-      el.ontimeupdate = () => setProgress(el.duration ? el.currentTime / el.duration : 0)
-      el.onended = stop
-      let analysed = true
-      try {
-        const ac = ctx.current?.ac ?? new AudioContext()
-        const an = ctx.current?.an ?? ac.createAnalyser()
-        an.fftSize = 128
-        if (!ctx.current) an.connect(ac.destination)
-        ctx.current = { ac, an }
-        ac.createMediaElementSource(el).connect(an)
-        await ac.resume()
-        await el.play()
-      } catch {
-        // CORS-blocked analysis: play plainly, the waveform falls back to a pulse.
-        const plain = new Audio(t.previewUrl)
-        audio.current = plain
-        plain.ontimeupdate = () => setProgress(plain.duration ? plain.currentTime / plain.duration : 0)
-        plain.onended = stop
-        analysed = false
-        await plain.play().catch(() => stop())
-      }
-      setPlaying(t.id)
-      const buf = new Uint8Array(64)
-      const loop = () => {
-        const a = audio.current
-        if (ctx.current && analysed) {
-          ctx.current.an.getByteFrequencyData(buf)
-          levels.current = buf
-        } else if (a) {
-          // Synthetic pulse keyed to playback time.
-          const tt = a.currentTime
-          levels.current = buf.map((_, i) => 110 + 90 * Math.abs(Math.sin(tt * 6 + i * 0.4)))
-        }
-        raf.current = requestAnimationFrame(loop)
-      }
-      loop()
-    },
-    [playing, stop],
-  )
-
-  useEffect(() => () => {
-    stop()
-    ctx.current?.ac.close().catch(() => {})
-  }, [stop])
-
-  return { play, stop, playing, progress, levels }
-}
 
 export function AudioScout() {
   const { t } = useTranslation()
@@ -112,6 +40,8 @@ export function AudioScout() {
   const [history, setHistory] = useState<Track[]>([])
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
+  /** Track shown in the "Song found" modal. */
+  const [match, setMatch] = useState<Track | null>(null)
   const mic = useRef(new Uint8Array(64))
   const preview = usePreview()
   const webgl = useMemo(hasWebGL, [])
@@ -125,6 +55,7 @@ export function AudioScout() {
     })
   }, [])
 
+  /** Show a recognised track in the flow and history, then pop the match modal. */
   const showResult = async (hit: Track) => {
     const full = await enrich(hit)
     const more = await searchTracks(full.artist, 10).catch(() => [])
@@ -134,7 +65,7 @@ export function AudioScout() {
     const nextHistory = [full, ...history.filter((h) => h.id !== full.id)]
     setHistory(nextHistory)
     saveHistory(nextHistory)
-    haptic('success')
+    setMatch(full)
   }
 
   const listen = async () => {
@@ -238,6 +169,7 @@ export function AudioScout() {
             whileTap={{ scale: 0.92 }}
             onClick={listen}
             disabled={busy}
+            data-audio-mic
             className="absolute inset-3 grid place-items-center rounded-full bg-[#1db954] text-[#0d1117] shadow-[0_10px_40px_-10px_rgba(29,185,84,0.8)] disabled:opacity-90"
             aria-label={t('audio.listen')}
           >
@@ -286,7 +218,7 @@ export function AudioScout() {
 
       {tracks.length > 0 && current && (
         <section>
-          {webgl ? <CoverFlow3D tracks={tracks} active={active} onChange={setActive} /> : <CoverFlowCSS tracks={tracks} active={active} onChange={setActive} />}
+          {webgl ? <CoverFlow3D tracks={tracks} active={active} onChange={setActive} onOpen={(i) => setMatch(tracks[i])} /> : <CoverFlowCSS tracks={tracks} active={active} onChange={setActive} onOpen={(i) => setMatch(tracks[i])} />}
           <AnimatePresence mode="wait">
             <motion.div key={current.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="-mt-2 text-center">
               <h2 className="text-lg font-semibold text-fog-50">{current.title}</h2>
@@ -372,6 +304,7 @@ export function AudioScout() {
         </section>
       )}
       <p className="px-1 text-[10px] text-fog-500">{t('audio.credit')}</p>
+      <TrackMatchModal track={match} onClose={() => setMatch(null)} preview={preview} />
     </div>
   )
 }
