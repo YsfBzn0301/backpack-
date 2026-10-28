@@ -91,8 +91,6 @@ export function ConvertModule() {
     haptic(res.verdict === 'steep' || res.verdict === 'high' ? 'warn' : 'success')
   }
 
-  const fresh = Date.now() - fx.fetchedAt < 24 * 3600_000
-
   return (
     <div className="space-y-4">
       <section className="card p-4">
@@ -104,12 +102,12 @@ export function ConvertModule() {
           </Pressable>
           <div className="h-px flex-1 bg-veil/5" />
         </div>
-        <CurrencyRow code={to} onPick={() => setPicking('to')} value={Number.isFinite(converted) ? formatNumber(converted, converted > 1000 ? 0 : 2) : '—'} label={people > 1 ? t('money.each', { n: people }) : t('money.youGet')} accent />
+        <CurrencyRow code={to} onPick={() => setPicking('to')} value={Number.isFinite(converted) ? formatNumber(converted, 2) : '—'} label={people > 1 ? t('money.each', { n: people }) : t('money.youGet')} accent />
         <div className="mt-3 flex items-center justify-between text-[11px] text-fog-500">
           <span>{t('money.rate', { from, to, rate: formatNumber(convert(1, from, to), 4) })}</span>
           <button onClick={() => refresh()} className="flex items-center gap-1 hover:text-fog-300">
             <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
-            {fx.source === 'seed' ? t('money.approx') : `${fresh ? t('common.live') : t('common.cached')} · ${relativeTime(fx.fetchedAt)}`}
+            {fx.source === 'seed' ? t('money.approx') : t('money.rateAsOf', { time: relativeTime(fx.rateAt ?? fx.fetchedAt) })}
           </button>
         </div>
         {error && fx.source === 'seed' && <p className="mt-1 text-[11px] text-amber-glow">{t('money.providerError')}</p>}

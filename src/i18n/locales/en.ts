@@ -414,6 +414,7 @@ const en = {
     each: 'Each of {{n}}',
     swap: 'Swap currencies',
     rate: '1 {{from}} = {{rate}} {{to}}',
+    rateAsOf: 'Rate updated {{time}}',
     approx: 'Approximate offline rates',
     providerError: 'Could not reach the rate provider. Using built-in approximate rates.',
     noTip: 'No tip',

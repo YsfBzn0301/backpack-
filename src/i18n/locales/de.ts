@@ -411,6 +411,7 @@ const de: Messages = {
     each: 'Pro Person ({{n}})',
     swap: 'Währungen tauschen',
     rate: '1 {{from}} = {{rate}} {{to}}',
+    rateAsOf: 'Kurs aktualisiert {{time}}',
     approx: 'Ungefähre Offline-Kurse',
     providerError: 'Kursanbieter nicht erreichbar. Es werden eingebaute Näherungswerte genutzt.',
     noTip: 'Kein Trinkgeld',

@@ -415,6 +415,7 @@ const tr: Messages = {
     each: 'Kişi başı ({{n}} kişi)',
     swap: 'Para birimlerini değiştir',
     rate: '1 {{from}} = {{rate}} {{to}}',
+    rateAsOf: 'Kur: {{time}}',
     approx: 'Yaklaşık çevrimdışı kurlar',
     providerError: 'Kur sağlayıcısına ulaşılamadı. Yerleşik yaklaşık kurlar kullanılıyor.',
     noTip: 'Bahşişsiz',

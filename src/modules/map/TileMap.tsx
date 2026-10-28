@@ -3,9 +3,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 /**
- * Lightweight slippy map (no SDK) on CARTO dark tiles over OpenStreetMap data.
+ * Lightweight slippy map (no SDK) on OpenStreetMap tiles (no key needed; dark theme uses a CSS filter).
  * Supports drag-to-pan, wheel / button zoom and positioned overlays.
  */
+// Turns the light OSM style into a dark map that matches the app.
+const DARK_TILES = 'invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.6)'
+
 export interface Overlay {
   key: string
   lat: number
@@ -73,16 +76,14 @@ export function TileMap({
     const y0 = Math.floor(origin.y / TILE)
     const x1 = Math.floor((origin.x + size.w) / TILE)
     const y1 = Math.floor((origin.y + size.h) / TILE)
-    const dpr = typeof window !== 'undefined' && window.devicePixelRatio > 1 ? '@2x' : ''
     for (let tx = x0; tx <= x1; tx++)
       for (let ty = y0; ty <= y1; ty++) {
         if (ty < 0 || ty >= n) continue
         const wx = ((tx % n) + n) % n
-        const sub = 'abcd'[(wx + ty) % 4]
-        out.push({ key: `${view.z}/${tx}/${ty}`, x: tx * TILE - origin.x, y: ty * TILE - origin.y, url: `https://${sub}.basemaps.cartocdn.com/${theme === 'light' ? 'rastertiles/voyager' : 'dark_all'}/${view.z}/${wx}/${ty}${dpr}.png` })
+        out.push({ key: `${view.z}/${tx}/${ty}`, x: tx * TILE - origin.x, y: ty * TILE - origin.y, url: `https://tile.openstreetmap.org/${view.z}/${wx}/${ty}.png` })
       }
     return out
-  }, [origin.x, origin.y, size.w, size.h, view.z, theme])
+  }, [origin.x, origin.y, size.w, size.h, view.z])
 
   const zoomBy = (d: number) => setView((v) => ({ ...v, z: Math.max(3, Math.min(19, v.z + d)) }))
 
@@ -119,7 +120,7 @@ export function TileMap({
       data-no-swipe
     >
       {tiles.map((t) => (
-        <img key={t.key} src={t.url} alt="" draggable={false} className="pointer-events-none absolute max-w-none" style={{ left: t.x, top: t.y, width: TILE, height: TILE }} />
+        <img key={t.key} src={t.url} alt="" draggable={false} className="pointer-events-none absolute max-w-none" style={{ left: t.x, top: t.y, width: TILE, height: TILE, filter: theme === 'light' ? undefined : DARK_TILES }} />
       ))}
       {rc && (
         <div
@@ -145,7 +146,7 @@ export function TileMap({
         </button>
       </div>
       <div className="pointer-events-auto absolute right-2 bottom-1 text-[9px] text-fog-500">
-        © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>
+        © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
       </div>
     </div>
   )

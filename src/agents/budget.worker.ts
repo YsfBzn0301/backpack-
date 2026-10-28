@@ -15,6 +15,8 @@ export interface RatesSnapshot {
   base: 'USD'
   rates: Record<string, number>
   fetchedAt: number
+  /** When the provider last updated its rates (falls back to fetchedAt). */
+  rateAt?: number
   source: 'seed' | 'exchangerate-api' | 'openexchangerates'
 }
 
@@ -70,11 +72,11 @@ async function sync(api: AgentApi<BudgetState>, force = false) {
     let snap: RatesSnapshot
     if (s.oxrAppId) {
       const r = await fetchJson<{ rates: Record<string, number>; timestamp: number }>(`https://openexchangerates.org/api/latest.json?app_id=${s.oxrAppId}`)
-      snap = { base: 'USD', rates: r.rates, fetchedAt: Date.now(), source: 'openexchangerates' }
+      snap = { base: 'USD', rates: r.rates, fetchedAt: Date.now(), rateAt: r.timestamp * 1000, source: 'openexchangerates' }
     } else {
-      const r = await fetchJson<{ result: string; rates: Record<string, number> }>('https://open.er-api.com/v6/latest/USD')
+      const r = await fetchJson<{ result: string; rates: Record<string, number>; time_last_update_unix?: number }>('https://open.er-api.com/v6/latest/USD')
       if (r.result !== 'success') throw new Error('rate provider error')
-      snap = { base: 'USD', rates: r.rates, fetchedAt: Date.now(), source: 'exchangerate-api' }
+      snap = { base: 'USD', rates: r.rates, fetchedAt: Date.now(), rateAt: r.time_last_update_unix ? r.time_last_update_unix * 1000 : undefined, source: 'exchangerate-api' }
     }
     // Keep seed values for any currency the provider dropped.
     snap.rates = { ...SEED_RATES, ...snap.rates }
