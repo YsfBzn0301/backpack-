@@ -3,12 +3,12 @@
  * cover flow, play the 30-second preview, jump to Spotify.
  */
 import { AnimatePresence, motion } from 'framer-motion'
-import { AudioLines, ExternalLink, History, KeyRound, Loader2, Mic, Pause, Play, Search } from 'lucide-react'
+import { AudioLines, ExternalLink, History, KeyRound, Loader2, Mic, Pause, Play, RotateCcw, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { enrich, loadHistory, recognize, recordClip, saveHistory, searchTracks, spotifyUrl, type Track } from '@/services/audio'
+import { AudioError, enrich, loadHistory, openMic, recognize, recordClip, saveHistory, searchTracks, spotifyUrl, TOKEN_CODES, type AudioErrorCode, type Track } from '@/services/audio'
 import { keys } from '@/lib/settings'
-import { openScreen } from '@/lib/ui'
+import { openSettings } from '@/lib/ui'
 import { haptic } from '@/lib/haptics'
 import { relativeTime } from '@/i18n/format'
 import { useOnline } from '@/hooks/useOnline'
@@ -18,6 +18,11 @@ import { CoverFlow3D, hasWebGL } from './CoverFlow3D'
 import { CoverFlowCSS } from './CoverFlowCSS'
 
 type Phase = 'idle' | 'listening' | 'matching' | 'nomatch' | 'error'
+
+const AUDD_DASHBOARD = 'https://dashboard.audd.io/'
+
+type AC = typeof AudioContext
+const AudioCtx = (): AC | undefined => (typeof window === 'undefined' ? undefined : (window.AudioContext ?? (window as unknown as { webkitAudioContext?: AC }).webkitAudioContext))
 
 /** Audio element + analyser for the live preview waveform. */
 function usePreview() {
@@ -98,6 +103,9 @@ export function AudioScout() {
   const online = useOnline()
   const [phase, setPhase] = useState<Phase>('idle')
   const [progress, setProgress] = useState(0)
+  /** Recognition failure (drives the error card). */
+  const [failure, setFailure] = useState<AudioErrorCode | null>(null)
+  /** One-line notices from the text search. */
   const [error, setError] = useState<string | null>(null)
   const [tracks, setTracks] = useState<Track[]>([])
   const [active, setActive] = useState(0)
@@ -108,6 +116,7 @@ export function AudioScout() {
   const preview = usePreview()
   const webgl = useMemo(hasWebGL, [])
   const hasToken = Boolean(keys.audd())
+  const searchInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadHistory().then((h) => {
@@ -129,47 +138,67 @@ export function AudioScout() {
   }
 
   const listen = async () => {
-    if (!hasToken) {
-      setError(t('audio.needToken'))
-      return
-    }
     setError(null)
+    setFailure(null)
     haptic('heavy')
-    let stream: MediaStream | null = null
+    // Create/resume the AudioContext synchronously inside the tap: iOS Safari
+    // only lets audio start from a user gesture, and the await below ends it.
+    let ac: AudioContext | null = null
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } })
-      // Levels for the waveform while recording.
-      const ac = new AudioContext()
-      const an = ac.createAnalyser()
-      an.fftSize = 128
-      ac.createMediaStreamSource(stream).connect(an)
-      const buf = new Uint8Array(an.frequencyBinCount)
-      let raf = 0
-      const loop = () => {
-        an.getByteFrequencyData(buf)
-        mic.current = buf
-        raf = requestAnimationFrame(loop)
+      const Ctx = AudioCtx()
+      if (Ctx) {
+        ac = new Ctx()
+        ac.resume().catch(() => {})
       }
-      loop()
+    } catch {
+      ac = null
+    }
+    let stream: MediaStream | null = null
+    let raf = 0
+    try {
+      stream = await openMic()
+      // Levels for the waveform while recording (cosmetic: never block on it).
+      try {
+        if (ac) {
+          if (ac.state !== 'running') await ac.resume().catch(() => {})
+          const an = ac.createAnalyser()
+          an.fftSize = 128
+          ac.createMediaStreamSource(stream).connect(an)
+          const buf = new Uint8Array(an.frequencyBinCount)
+          const loop = () => {
+            an.getByteFrequencyData(buf)
+            mic.current = buf
+            raf = requestAnimationFrame(loop)
+          }
+          loop()
+        }
+      } catch {
+        /* waveform falls back to idle */
+      }
       setPhase('listening')
       const clip = await recordClip(stream, 8000, setProgress)
       cancelAnimationFrame(raf)
-      ac.close().catch(() => {})
+      stream.getTracks().forEach((tr) => tr.stop())
       setPhase('matching')
       const hit = await recognize(clip)
-      if (!hit) {
-        setPhase('nomatch')
-        haptic('warn')
-        return
-      }
       await showResult(hit)
       setPhase('idle')
     } catch (e) {
-      const m = e instanceof Error ? e.message : String(e)
-      setError(m === 'no-token' ? t('audio.needToken') : /denied|NotAllowed/i.test(m) ? t('audio.micBlocked') : online ? t('audio.failed') : t('audio.offline'))
-      setPhase('error')
+      const code: AudioErrorCode = e instanceof AudioError ? e.code : 'service'
+      if (e instanceof AudioError && e.code !== 'no-match') console.warn('[audio]', e.code, e.auddCode ?? '', e.message)
+      if (code === 'no-match') {
+        setPhase('nomatch')
+        setFailure('no-match')
+        haptic('warn')
+      } else {
+        setFailure((code === 'network' || code === 'timeout') && !online ? 'network' : code)
+        setPhase('error')
+        haptic('warn')
+      }
     } finally {
+      cancelAnimationFrame(raf)
       stream?.getTracks().forEach((tr) => tr.stop())
+      ac?.close().catch(() => {})
       setProgress(0)
     }
   }
@@ -216,14 +245,29 @@ export function AudioScout() {
             {phase === 'listening' && <motion.span className="absolute inset-0 rounded-full bg-[#1db954]" animate={{ scale: [1, 1.35], opacity: [0.45, 0] }} transition={{ duration: 1.3, repeat: Infinity }} />}
           </motion.button>
         </div>
-        <p className="relative mt-3 text-sm font-medium text-fog-50">{t(`audio.phase.${phase}`)}</p>
+        <p className="relative mt-3 text-sm font-medium text-fog-50" role="status">
+          {failure && (phase === 'error' || phase === 'nomatch') ? t(`audio.err.${failure}.title`) : t(`audio.phase.${phase}`)}
+        </p>
         <div className="relative mt-1 h-10">
           <Waveform levels={mic} active={phase === 'listening'} color="#1db954" />
         </div>
-        {!hasToken && (
-          <button onClick={() => openScreen('settings')} className="relative mt-1 inline-flex items-center gap-1.5 text-xs text-fog-400 hover:text-fog-100">
-            <KeyRound size={12} /> {t('audio.tokenHint')}
-          </button>
+        {failure && (phase === 'error' || phase === 'nomatch') ? (
+          <FailureCard
+            code={failure}
+            offline={!online}
+            onRetry={listen}
+            onSearch={() => {
+              searchInput.current?.focus()
+              searchInput.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }}
+          />
+        ) : (
+          !hasToken &&
+          !busy && (
+            <button onClick={() => openSettings('audd')} className="relative mt-1 inline-flex items-center gap-1.5 text-xs text-fog-400 hover:text-fog-100">
+              <KeyRound size={12} /> {t('audio.tokenHint')}
+            </button>
+          )
         )}
         {error && <p className="relative mt-2 text-xs text-amber-glow">{error}</p>}
       </section>
@@ -236,7 +280,7 @@ export function AudioScout() {
         className="glass flex items-center gap-2 rounded-2xl px-3.5 py-2.5"
       >
         <Search size={16} className="text-fog-500" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('audio.searchPlaceholder')} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-fog-500" enterKeyHint="search" />
+        <input ref={searchInput} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('audio.searchPlaceholder')} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-fog-500" enterKeyHint="search" />
         {searching && <Loader2 size={15} className="animate-spin text-fog-500" />}
       </form>
 
@@ -328,6 +372,39 @@ export function AudioScout() {
         </section>
       )}
       <p className="px-1 text-[10px] text-fog-500">{t('audio.credit')}</p>
+    </div>
+  )
+}
+
+function FailureCard({ code, offline, onRetry, onSearch }: { code: AudioErrorCode; offline: boolean; onRetry: () => void; onSearch: () => void }) {
+  const { t } = useTranslation()
+  const tokenProblem = TOKEN_CODES.includes(code)
+  const body = code === 'network' && offline ? t('audio.offline') : t(`audio.err.${code}.body`)
+  const btn = 'inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-medium'
+  return (
+    <div className="relative mx-auto mt-2 max-w-sm text-center">
+      <p className="text-xs leading-relaxed text-fog-300">{body}</p>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        {tokenProblem ? (
+          <>
+            <button onClick={() => openSettings('audd')} className={`${btn} bg-[#1db954] text-[#0d1117]`}>
+              <KeyRound size={13} /> {t('audio.addKey')}
+            </button>
+            <a href={AUDD_DASHBOARD} target="_blank" rel="noopener" className={`${btn} bg-veil/[0.07] text-fog-100`}>
+              <ExternalLink size={13} /> {t('audio.getKey')}
+            </a>
+          </>
+        ) : (
+          code !== 'mic-unsupported' && (
+            <button onClick={onRetry} className={`${btn} bg-veil/[0.07] text-fog-100`}>
+              <RotateCcw size={13} /> {t('audio.retry')}
+            </button>
+          )
+        )}
+        <button onClick={onSearch} className={`${btn} text-fog-400 hover:text-fog-100`}>
+          <Search size={13} /> {t('audio.searchInstead')}
+        </button>
+      </div>
     </div>
   )
 }

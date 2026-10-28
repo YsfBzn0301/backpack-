@@ -25,6 +25,8 @@ export const ui = createStore({
   screen: pick(params.get('screen'), SCREENS) as Screen | null,
   helpOpen: typeof window !== 'undefined' && isHelpPath(),
   helpFocus: null as string | null,
+  /** Settings field to scroll to when Settings opens, e.g. 'audd'. */
+  settingsFocus: null as string | null,
   sosOpen: params.get('sos') === '1',
   scannerOpen: false,
   cameraOpen: action === 'camera',
@@ -55,6 +57,12 @@ export function openScreen(screen: Screen) {
   if (ui.get().screen === screen) return
   push({ screen }, `${BASE}?screen=${screen}`)
   ui.set({ screen })
+}
+
+/** Open Settings, optionally scrolled to a field (e.g. 'audd' for the AudD key). */
+export function openSettings(focus?: string) {
+  ui.set({ settingsFocus: focus ?? null })
+  openScreen('settings')
 }
 
 export function closeScreen() {

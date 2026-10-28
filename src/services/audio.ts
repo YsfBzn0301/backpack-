@@ -9,6 +9,7 @@
  */
 import { createStore, get, set } from 'idb-keyval'
 import { keys } from '@/lib/settings'
+import { AudioError, auddRecognize, micError } from './audd'
 
 export interface Track {
   id: string
@@ -28,44 +29,78 @@ export interface Track {
 export const spotifyUrl = (t: Track) =>
   t.spotifyId ? `https://open.spotify.com/track/${t.spotifyId}` : `https://open.spotify.com/search/${encodeURIComponent(`${t.artist} ${t.title}`)}`
 
+export { AudioError, TOKEN_CODES, type AudioErrorCode } from './audd'
+
+/** Recorder mime types in order of preference; iOS Safari only does audio/mp4. */
+const MIME_PREFS = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus', 'audio/ogg']
+
+export const canRecord = () => typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia) && typeof MediaRecorder !== 'undefined'
+
+export function pickMime(): string | undefined {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return undefined
+  return MIME_PREFS.find((m) => {
+    try {
+      return MediaRecorder.isTypeSupported(m)
+    } catch {
+      return false
+    }
+  })
+}
+
+/** Open the microphone, throwing AudioError('mic-denied' | 'mic-unsupported'). */
+export async function openMic(): Promise<MediaStream> {
+  if (!canRecord()) throw new AudioError('mic-unsupported')
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'OverconstrainedError') {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true })
+      } catch (e2) {
+        throw micError(e2)
+      }
+    }
+    throw micError(e)
+  }
+}
+
 /** Record from the mic for `ms`, returning the audio blob. */
 export async function recordClip(stream: MediaStream, ms = 8000, onTick?: (p: number) => void): Promise<Blob> {
-  const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((m) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m))
-  const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
-  const chunks: BlobPart[] = []
-  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data)
-  const done = new Promise<Blob>((resolve) => (rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || 'audio/webm' }))))
-  rec.start(250)
+  if (typeof MediaRecorder === 'undefined') throw new AudioError('mic-unsupported')
+  const mime = pickMime()
+  let rec: MediaRecorder
+  try {
+    rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+  } catch (e) {
+    throw micError(e)
+  }
+  const chunks: Blob[] = []
+  rec.ondataavailable = (e) => {
+    if (e.data.size) chunks.push(e.data)
+  }
+  const done = new Promise<Blob>((resolve, reject) => {
+    rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || chunks[0]?.type || mime || 'audio/webm' }))
+    rec.onerror = (ev) => reject(micError((ev as Event & { error?: unknown }).error ?? ev))
+  })
   const started = Date.now()
   const id = setInterval(() => onTick?.(Math.min(1, (Date.now() - started) / ms)), 100)
-  await new Promise((r) => setTimeout(r, ms))
-  clearInterval(id)
-  rec.stop()
-  return done
+  try {
+    rec.start(250)
+    await new Promise((r) => setTimeout(r, ms))
+  } catch (e) {
+    throw micError(e)
+  } finally {
+    clearInterval(id)
+    if (rec.state !== 'inactive') rec.stop()
+  }
+  const blob = await done
+  if (!blob.size) throw new AudioError('bad-audio', 'empty recording')
+  return blob
 }
 
-interface AuddResult {
-  artist: string
-  title: string
-  album?: string
-  release_date?: string
-  song_link?: string
-  apple_music?: { url?: string; artwork?: { url?: string }; previews?: { url: string }[] }
-  spotify?: { id?: string; preview_url?: string | null; album?: { images?: { url: string }[] } }
-}
-
-export async function recognize(clip: Blob): Promise<Track | null> {
-  const token = keys.audd()
-  if (!token) throw new Error('no-token')
-  const fd = new FormData()
-  fd.append('api_token', token)
-  fd.append('return', 'spotify,apple_music')
-  fd.append('file', clip, clip.type.includes('mp4') ? 'clip.m4a' : 'clip.webm')
-  const res = await fetch('https://api.audd.io/', { method: 'POST', body: fd })
-  const data: { status: string; result: AuddResult | null; error?: { error_message?: string } } = await res.json()
-  if (data.status !== 'success') throw new Error(data.error?.error_message ?? 'recognition failed')
-  const r = data.result
-  if (!r) return null
+/** Identify a clip. Throws AudioError; `no-match` when AudD found nothing. */
+export async function recognize(clip: Blob): Promise<Track> {
+  const r = await auddRecognize(clip, keys.audd())
   const art = r.spotify?.album?.images?.[0]?.url ?? r.apple_music?.artwork?.url?.replace('{w}', '600').replace('{h}', '600')
   return {
     id: `audd-${r.spotify?.id ?? `${r.artist}-${r.title}`}`,

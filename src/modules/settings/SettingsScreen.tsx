@@ -26,6 +26,20 @@ export function SettingsScreen() {
     })()
   }, [])
 
+  // Opened from another module to fix a specific key (e.g. Audio Scout → AudD).
+  useEffect(() => {
+    const focus = ui.get().settingsFocus
+    if (!focus) return
+    ui.set({ settingsFocus: null })
+    const id = setTimeout(() => {
+      const el = document.getElementById(`key-${focus}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.focus({ preventScroll: true })
+    }, 350)
+    return () => clearTimeout(id)
+  }, [])
+
   const themes = [
     { id: 'system', Icon: Monitor },
     { id: 'dark', Icon: Moon },
@@ -152,7 +166,7 @@ export function SettingsScreen() {
           <p className="text-xs leading-relaxed text-fog-500">{t('settings.keysHint')}</p>
           <KeyInput label={t('settings.googleKey')} value={s.googleMapsKey} onChange={(v) => settings.set({ googleMapsKey: v })} note={t('settings.reloadNote')} />
           <KeyInput label={t('settings.owmKey')} value={s.openWeatherKey} onChange={(v) => settings.set({ openWeatherKey: v })} />
-          <KeyInput label={t('settings.auddKey')} value={s.auddToken} onChange={(v) => settings.set({ auddToken: v })} />
+          <KeyInput id="key-audd" label={t('settings.auddKey')} value={s.auddToken} onChange={(v) => settings.set({ auddToken: v })} />
           <KeyInput label={t('settings.translateEndpoint')} value={s.translateEndpoint} onChange={(v) => settings.set({ translateEndpoint: v })} type="url" />
         </div>
       </section>
@@ -227,17 +241,24 @@ function Stepper({ value, step, min, max, format, onChange }: { value: number; s
   )
 }
 
-function KeyInput({ label, value, onChange, note, type = 'password' }: { label: string; value: string; onChange: (v: string) => void; note?: string; type?: string }) {
+function KeyInput({ id, label, value, onChange, note, type = 'password' }: { id?: string; label: string; value: string; onChange: (v: string) => void; note?: string; type?: string }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(value)
+  // Save shortly after typing/pasting too, so leaving the screen never loses a key.
+  useEffect(() => {
+    if (draft.trim() === value) return
+    const timer = setTimeout(() => onChange(draft.trim()), 800)
+    return () => clearTimeout(timer)
+  }, [draft, value, onChange])
   return (
     <label className="block">
       <span className="text-xs text-fog-400">{label}</span>
       <input
+        id={id}
         type={type}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => draft !== value && onChange(draft.trim())}
+        onBlur={() => draft.trim() !== value && onChange(draft.trim())}
         placeholder={t('settings.notSet')}
         autoComplete="off"
         spellCheck={false}
