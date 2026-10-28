@@ -15,11 +15,15 @@ const pick = <T extends string>(v: string | null, list: readonly T[]) => (v && (
 const initialTab = pick(params.get('tab'), TABS) ?? 'home'
 const action = params.get('action')
 
+/** App base path, e.g. '/' locally or '/backpack-/' on GitHub Pages. */
+const BASE = import.meta.env.BASE_URL
+const isHelpPath = () => window.location.pathname.replace(/\/$/, '') === `${BASE}help`
+
 export const ui = createStore({
   tab: initialTab as Tab,
   prevTab: initialTab as Tab,
   screen: pick(params.get('screen'), SCREENS) as Screen | null,
-  helpOpen: typeof window !== 'undefined' && window.location.pathname.replace(/\/$/, '') === '/help',
+  helpOpen: typeof window !== 'undefined' && isHelpPath(),
   helpFocus: null as string | null,
   sosOpen: params.get('sos') === '1',
   scannerOpen: false,
@@ -49,7 +53,7 @@ export function goTab(tab: Tab) {
 
 export function openScreen(screen: Screen) {
   if (ui.get().screen === screen) return
-  push({ screen }, `/?screen=${screen}`)
+  push({ screen }, `${BASE}?screen=${screen}`)
   ui.set({ screen })
 }
 
@@ -59,14 +63,14 @@ export function closeScreen() {
 }
 
 export function openHelp(focus?: string) {
-  push({ help: true }, '/help')
+  push({ help: true }, `${BASE}help`)
   ui.set({ helpOpen: true, helpFocus: focus ?? null })
 }
 
 export function closeHelp() {
   if (history.state?.help) history.back()
   else {
-    push({}, '/')
+    push({}, BASE)
     ui.set({ helpOpen: false })
   }
 }
@@ -81,7 +85,7 @@ if (typeof window !== 'undefined') {
     const st = (e.state ?? {}) as { screen?: Screen; help?: boolean }
     ui.set({
       screen: st.screen ?? null,
-      helpOpen: Boolean(st.help) || window.location.pathname.replace(/\/$/, '') === '/help',
+      helpOpen: Boolean(st.help) || isHelpPath(),
     })
   })
 }

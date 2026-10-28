@@ -120,3 +120,17 @@ src/
 - Browsers can't write directly to the camera roll. Saving goes through the share sheet or a download.
 - Speech recognition depends on the browser (Chrome, Edge, Safari). `navigator.vibrate` is ignored on iOS.
 - Emergency numbers are reference data. Check them locally on arrival.
+
+## Deploy to GitHub Pages
+
+The workflow in `.github/workflows/deploy.yml` builds the app and publishes it to
+`https://<user>.github.io/<repo>/`.
+
+1. In the repo, open **Settings → Pages** and set **Source** to **GitHub Actions**.
+2. Push (or run the workflow from the **Actions** tab).
+
+The Pages build uses the free keyless services only. Anything in `VITE_*` ends up in the
+public JavaScript, so only add keys there that are meant to be public and restricted
+(for example a Google Maps key locked to your Pages domain).
+
+The base path comes from `BASE_PATH` at build time; local `npm run dev` still uses `/`.

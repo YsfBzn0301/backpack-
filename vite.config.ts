@@ -5,7 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
+// GitHub Pages serves the app from /<repo>/, so the base path comes from the
+// environment (set in .github/workflows/deploy.yml). Locally it stays '/'.
+const base = process.env.BASE_PATH ?? '/'
+
 export default defineConfig({
+  base,
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   worker: { format: 'es' },
   test: { include: ['src/**/*.test.ts'], environment: 'node' },
@@ -36,25 +41,25 @@ export default defineConfig({
         background_color: '#0d1117',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        start_url: base,
+        scope: base,
         categories: ['travel', 'navigation', 'utilities'],
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-          { src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml' },
+          { src: base + 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: base + 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: base + 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: base + 'icons/icon.svg', sizes: 'any', type: 'image/svg+xml' },
         ],
         shortcuts: [
-          { name: 'Emergency SOS', url: '/?sos=1', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
-          { name: 'Find parking', url: '/?tab=map&mode=parking', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
-          { name: 'Departures', url: '/?tab=transit', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
-          { name: 'Camera', url: '/?action=camera', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Emergency SOS', url: base + '?sos=1', icons: [{ src: base + 'icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Find parking', url: base + '?tab=map&mode=parking', icons: [{ src: base + 'icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Departures', url: base + '?tab=transit', icons: [{ src: base + 'icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Camera', url: base + '?action=camera', icons: [{ src: base + 'icons/icon-192.png', sizes: '192x192' }] },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        navigateFallback: '/index.html',
+        navigateFallback: base + 'index.html',
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
