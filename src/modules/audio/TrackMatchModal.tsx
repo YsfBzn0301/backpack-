@@ -366,12 +366,14 @@ function Dialog({ track, onClose, preview }: { track: Track; onClose: () => void
 }
 
 function Stage({ track, motion, webgl, accent }: { track: Track; motion: CaseMotion; webgl: boolean; accent: string }) {
+  const [artBlocked, setArtBlocked] = useState(false)
+  useEffect(() => setArtBlocked(false), [track.artwork])
   const css = <AlbumCaseCSS track={track} motion={motion} />
-  if (!webgl) return css
+  if (!webgl || artBlocked) return css
   return (
     <GLBoundary fallback={css}>
       <Suspense fallback={css}>
-        <AlbumCase3D track={track} motion={motion} accent={accent} />
+        <AlbumCase3D track={track} motion={motion} accent={accent} onArtFail={() => setArtBlocked(true)} />
       </Suspense>
     </GLBoundary>
   )

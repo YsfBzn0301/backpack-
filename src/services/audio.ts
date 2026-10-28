@@ -101,7 +101,7 @@ export async function recordClip(stream: MediaStream, ms = 8000, onTick?: (p: nu
 /** Identify a clip. Throws AudioError; `no-match` when AudD found nothing. */
 export async function recognize(clip: Blob): Promise<Track> {
   const r = await auddRecognize(clip, keys.audd())
-  const art = r.spotify?.album?.images?.[0]?.url ?? r.apple_music?.artwork?.url?.replace('{w}', '600').replace('{h}', '600')
+  const art = r.spotify?.album?.images?.[0]?.url ?? r.apple_music?.artwork?.url?.replace('{w}', '600').replace('{h}', '600').replace('{c}', 'bb').replace('{f}', 'jpg')
   return {
     id: `audd-${r.spotify?.id ?? `${r.artist}-${r.title}`}`,
     title: r.title,

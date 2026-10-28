@@ -38,8 +38,9 @@ export function useCaseMotion(tilt: React.RefObject<{ x: number; y: number }>, r
       st.time += dt
       if (st.drag) return st
       const g = tilt.current ?? { x: 0, y: 0 }
-      const idleY = reduced ? 0 : Math.sin(st.time * 0.45) * 0.38
-      const idleX = reduced ? -0.04 : -0.06 + Math.sin(st.time * 0.31) * 0.06
+      // Keeps the sleeve visibly turning: about ±34° every ~6 s, with a slow nod.
+      const idleY = reduced ? Math.sin(st.time * 0.4) * 0.14 : Math.sin(st.time * 1.05) * 0.6 + Math.sin(st.time * 0.37) * 0.12
+      const idleX = reduced ? -0.04 : -0.06 + Math.sin(st.time * 0.8) * 0.14
       let ty = idleY + g.y * 0.65
       const tx = idleX + g.x * 0.45
       // Settle on the nearest front-facing turn so a hard flick doesn't rewind.

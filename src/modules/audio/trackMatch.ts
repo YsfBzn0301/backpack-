@@ -44,3 +44,14 @@ export function tiltFromOrientation(beta: number, gamma: number, base: { beta: n
   const clamp = (v: number) => Math.max(-1, Math.min(1, v))
   return { x: clamp((beta - base.beta) / range), y: clamp((gamma - base.gamma) / range) }
 }
+
+/**
+ * Cover URL for WebGL textures. A plain <img> of the same cover may already be
+ * cached as an opaque (no-CORS) response by the browser or the service worker,
+ * which WebGL can't read. A distinct URL forces a fresh CORS request.
+ */
+export function corsArtUrl(url: string): string {
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url
+  const [base, hash = ''] = url.split('#')
+  return `${base}${base.includes('?') ? '&' : '?'}bpcors=1${hash ? `#${hash}` : ''}`
+}

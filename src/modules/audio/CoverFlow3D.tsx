@@ -6,6 +6,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { Track } from '@/services/audio'
+import { corsArtUrl } from './trackMatch'
 
 const SIZE = 1.6
 
@@ -50,7 +51,9 @@ function getReflectionMask() {
   return reflectionMask
 }
 
-function useCoverTexture(track: Track) {
+function useCoverTexture(track: Track, onFail?: () => void) {
+  const failRef = useRef(onFail)
+  failRef.current = onFail
   const [tex, setTex] = useState<THREE.Texture>(() => placeholderTexture(track))
   useEffect(() => {
     if (!track.artwork) return
@@ -58,7 +61,7 @@ function useCoverTexture(track: Track) {
     const loader = new THREE.TextureLoader()
     loader.setCrossOrigin('anonymous')
     loader.load(
-      track.artwork,
+      corsArtUrl(track.artwork),
       (t) => {
         if (!alive) return t.dispose()
         t.colorSpace = THREE.SRGBColorSpace
@@ -66,7 +69,9 @@ function useCoverTexture(track: Track) {
         setTex(t)
       },
       undefined,
-      () => {},
+      () => {
+        if (alive) failRef.current?.()
+      },
     )
     return () => {
       alive = false
@@ -76,11 +81,11 @@ function useCoverTexture(track: Track) {
   return tex
 }
 
-function Cover({ track, index, pos, onPick }: { track: Track; index: number; pos: React.RefObject<number>; onPick: (i: number) => void }) {
+function Cover({ track, index, pos, onPick, onArtFail }: { track: Track; index: number; pos: React.RefObject<number>; onPick: (i: number) => void; onArtFail?: () => void }) {
   const group = useRef<THREE.Group>(null)
   const front = useRef<THREE.MeshBasicMaterial>(null)
   const back = useRef<THREE.MeshBasicMaterial>(null)
-  const tex = useCoverTexture(track)
+  const tex = useCoverTexture(track, onArtFail)
   const mask = useMemo(getReflectionMask, [])
 
   useFrame(() => {
@@ -121,7 +126,7 @@ function Cover({ track, index, pos, onPick }: { track: Track; index: number; pos
   )
 }
 
-function Rail({ tracks, target, onPick }: { tracks: Track[]; target: React.RefObject<number>; onPick: (i: number) => void }) {
+function Rail({ tracks, target, onPick, onArtFail }: { tracks: Track[]; target: React.RefObject<number>; onPick: (i: number) => void; onArtFail?: () => void }) {
   const pos = useRef(target.current)
   useFrame((_, dt) => {
     // Critically-damped follow of the target index.
@@ -130,13 +135,13 @@ function Rail({ tracks, target, onPick }: { tracks: Track[]; target: React.RefOb
   return (
     <group position={[0, 0.45, 0]}>
       {tracks.map((t, i) => (
-        <Cover key={t.id} track={t} index={i} pos={pos} onPick={onPick} />
+        <Cover key={t.id} track={t} index={i} pos={pos} onPick={onPick} onArtFail={onArtFail} />
       ))}
     </group>
   )
 }
 
-export function CoverFlow3D({ tracks, active, onChange, onOpen }: { tracks: Track[]; active: number; onChange: (i: number) => void; onOpen?: (i: number) => void }) {
+export function CoverFlow3D({ tracks, active, onChange, onOpen, onArtFail }: { tracks: Track[]; active: number; onChange: (i: number) => void; onOpen?: (i: number) => void; onArtFail?: () => void }) {
   const target = useRef(active)
   const drag = useRef<{ x: number; start: number; moved: boolean } | null>(null)
 
@@ -182,6 +187,7 @@ export function CoverFlow3D({ tracks, active, onChange, onOpen }: { tracks: Trac
         <Rail
           tracks={tracks}
           target={target}
+          onArtFail={onArtFail}
           onPick={(i) => {
             if (drag.current?.moved) return
             // Tapping the centred cover opens its details.

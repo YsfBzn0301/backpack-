@@ -42,7 +42,7 @@ export function AlbumCaseCSS({ track, motion }: { track: Track; motion: CaseMoti
     const loop = (now: number) => {
       const pose = motion.step((now - last) / 1000)
       last = now
-      if (box.current) box.current.style.transform = `rotateX(${-pose.rx}rad) rotateY(${pose.ry}rad)`
+      if (box.current) box.current.style.transform = `translateY(${Math.sin(now / 625) * (motion.reduced ? 2 : 7)}px) rotateX(${-pose.rx}rad) rotateY(${pose.ry}rad)`
       // Light sweeps across the front as it turns.
       if (sheen.current) sheen.current.style.backgroundPosition = `${50 + Math.sin(pose.ry) * 60}% ${50 + Math.sin(pose.rx) * 40}%`
       raf = requestAnimationFrame(loop)

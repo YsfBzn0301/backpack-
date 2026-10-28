@@ -44,7 +44,9 @@ export function AudioScout() {
   const [match, setMatch] = useState<Track | null>(null)
   const mic = useRef(new Uint8Array(64))
   const preview = usePreview()
-  const webgl = useMemo(hasWebGL, [])
+  // Covers whose host refuses CORS can't become WebGL textures: show the <img> flow instead.
+  const [artBlocked, setArtBlocked] = useState(false)
+  const webgl = useMemo(hasWebGL, []) && !artBlocked
   const hasToken = Boolean(keys.audd())
   const searchInput = useRef<HTMLInputElement>(null)
 
@@ -218,7 +220,7 @@ export function AudioScout() {
 
       {tracks.length > 0 && current && (
         <section>
-          {webgl ? <CoverFlow3D tracks={tracks} active={active} onChange={setActive} onOpen={(i) => setMatch(tracks[i])} /> : <CoverFlowCSS tracks={tracks} active={active} onChange={setActive} onOpen={(i) => setMatch(tracks[i])} />}
+          {webgl ? <CoverFlow3D tracks={tracks} active={active} onChange={setActive} onOpen={(i) => setMatch(tracks[i])} onArtFail={() => setArtBlocked(true)} /> : <CoverFlowCSS tracks={tracks} active={active} onChange={setActive} onOpen={(i) => setMatch(tracks[i])} />}
           <AnimatePresence mode="wait">
             <motion.div key={current.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="-mt-2 text-center">
               <h2 className="text-lg font-semibold text-fog-50">{current.title}</h2>

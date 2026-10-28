@@ -53,3 +53,12 @@ describe('tiltFromOrientation', () => {
     expect(tiltFromOrientation(170, 90, { beta: 45, gamma: 0 })).toEqual({ x: 1, y: 1 })
   })
 })
+
+describe('corsArtUrl', async () => {
+  const { corsArtUrl } = await import('@/modules/audio/trackMatch')
+  it('gives WebGL its own cover URL so a cached opaque copy is never reused', () => {
+    expect(corsArtUrl('https://i.scdn.co/image/ab67616d0000b273')).toBe('https://i.scdn.co/image/ab67616d0000b273?bpcors=1')
+    expect(corsArtUrl('https://x.mzstatic.com/a/600x600bb.jpg?v=2')).toBe('https://x.mzstatic.com/a/600x600bb.jpg?v=2&bpcors=1')
+    expect(corsArtUrl('data:image/png;base64,AA')).toBe('data:image/png;base64,AA')
+  })
+})

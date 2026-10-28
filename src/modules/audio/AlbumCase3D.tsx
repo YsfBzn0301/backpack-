@@ -9,7 +9,7 @@ import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import type { Track } from '@/services/audio'
 import type { CaseMotion } from './caseMotion'
-import { initials, trackHue } from './trackMatch'
+import { initials, trackHue, corsArtUrl } from './trackMatch'
 
 const W = 2
 const D = 0.07
@@ -95,7 +95,9 @@ function shadowTexture() {
 }
 
 /** Artwork texture (CORS-anonymous); the generated placeholder until/unless it loads. */
-function useArtwork(track: Track) {
+function useArtwork(track: Track, onFail?: () => void) {
+  const failRef = useRef(onFail)
+  failRef.current = onFail
   const placeholder = useMemo(() => placeholderTexture(track), [track])
   const [art, setArt] = useState<THREE.Texture | null>(null)
   useEffect(() => {
@@ -105,7 +107,7 @@ function useArtwork(track: Track) {
     const loader = new THREE.TextureLoader()
     loader.setCrossOrigin('anonymous')
     loader.load(
-      track.artwork,
+      corsArtUrl(track.artwork),
       (t) => {
         if (!alive) return t.dispose()
         t.colorSpace = THREE.SRGBColorSpace
@@ -114,7 +116,8 @@ function useArtwork(track: Track) {
       },
       undefined,
       () => {
-        /* CORS or 404: keep the placeholder */
+        // Host refused CORS (or 404): let the modal switch to the <img>-based sleeve.
+        if (alive) failRef.current?.()
       },
     )
     return () => {
@@ -142,12 +145,12 @@ function Environment() {
   return null
 }
 
-function Sleeve({ track, motion }: { track: Track; motion: CaseMotion }) {
+function Sleeve({ track, motion, onArtFail }: { track: Track; motion: CaseMotion; onArtFail?: () => void }) {
   const group = useRef<THREE.Group>(null)
   const disc = useRef<THREE.Group>(null)
   const spin = useRef<THREE.Group>(null)
   const shadow = useRef<THREE.Mesh>(null)
-  const tex = useArtwork(track)
+  const tex = useArtwork(track, onArtFail)
   const grooves = useMemo(grooveTexture, [])
   const shadowTex = useMemo(shadowTexture, [])
   const slide = useRef(motion.reduced ? SLIDE : 0)
@@ -166,12 +169,12 @@ function Sleeve({ track, motion }: { track: Track; motion: CaseMotion }) {
     const g = group.current
     if (g) {
       g.rotation.set(pose.rx, pose.ry, 0)
-      g.position.y = motion.reduced ? 0.05 : 0.05 + Math.sin(clock.current * 1.2) * 0.035
+      g.position.y = 0.05 + Math.sin(clock.current * 1.6) * (motion.reduced ? 0.02 : 0.09)
     }
     // The record eases out of the sleeve shortly after the modal opens.
     if (!motion.reduced && clock.current > 0.35) slide.current += (SLIDE - slide.current) * (1 - Math.exp(-dt * 3.2))
     if (disc.current) disc.current.position.x = slide.current
-    if (spin.current && !motion.reduced) spin.current.rotation.z -= dt * 0.55
+    if (spin.current) spin.current.rotation.z -= dt * (motion.reduced ? 0.4 : 1.8)
     if (shadow.current) {
       // Shadow narrows as the sleeve turns edge-on.
       const m = shadow.current.material as THREE.MeshBasicMaterial
@@ -220,7 +223,7 @@ function Sleeve({ track, motion }: { track: Track; motion: CaseMotion }) {
   )
 }
 
-export default function AlbumCase3D({ track, motion, accent }: { track: Track; motion: CaseMotion; accent: string }) {
+export default function AlbumCase3D({ track, motion, accent, onArtFail }: { track: Track; motion: CaseMotion; accent: string; onArtFail?: () => void }) {
   return (
     <Canvas
       dpr={[1, 2]}
@@ -234,7 +237,7 @@ export default function AlbumCase3D({ track, motion, accent }: { track: Track; m
       <directionalLight position={[-2.5, 3, 4]} intensity={2.1} />
       <directionalLight position={[3, -1, -3]} intensity={1.1} color={accent} />
       <pointLight position={[3.5, 2.5, 4]} intensity={3} distance={12} color="#ffffff" />
-      <Sleeve track={track} motion={motion} />
+      <Sleeve track={track} motion={motion} onArtFail={onArtFail} />
     </Canvas>
   )
 }
