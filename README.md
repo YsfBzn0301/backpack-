@@ -25,7 +25,7 @@ No API keys are required. Without keys, Backpack uses free, keyless providers:
 | Map | Google Maps JS (dark or light style) | Built-in tile map on CARTO tiles / OpenStreetMap |
 | Nearby places & parking lots | Google Places (New) + OpenStreetMap | OpenStreetMap via Overpass |
 | Live parking availability | ParkenDD (keyless), or your own provider via `VITE_PARKING_ENDPOINT` | ParkenDD |
-| Public transit | Deutsche Bahn HAFAS (keyless, `v6.db.transport.rest`); Google Directions transit with a Maps key | HAFAS + Google Maps deep links |
+| Public transit | Transitous (keyless, `api.transitous.org`, open GTFS + realtime); Google Directions transit with a Maps key | Transitous + Google Maps deep links |
 | Exchange rates | Open Exchange Rates (`VITE_OXR_APP_ID`) | ExchangeRate-API open endpoint |
 | Translation | Your own endpoint (`VITE_TRANSLATE_ENDPOINT`) | MyMemory |
 | Song recognition | AudD (`VITE_AUDD_TOKEN`) | Search only (iTunes Search, keyless) |
@@ -104,7 +104,7 @@ The service worker precaches the app shell, fonts and language packs. At runtime
 ```
 src/
   agents/       protocol, worker runtime, AgentHost, Scout/Translate/Budget/Safety workers
-  services/     weather, geocoding, places, parking (+ OSM tag parser), transit (HAFAS), audio (AudD/iTunes)
+  services/     weather, geocoding, places, parking (+ OSM tag parser), transit (Transitous), audio (AudD/iTunes)
   lib/          stores, settings, theme, navigation, opening-hours evaluator, parking cost model, crypto, vault, checklist
   modules/      home, map, parking, transit, convert, translate, audio, camera, checklist, vault, settings, sos, scanner, kit
   help/         featuresRegistry, Help Center, micro-demos, first-run tour
@@ -116,7 +116,7 @@ src/
 ## Caveats
 
 - Parking rates, conditions and road rules come from OpenStreetMap tags and bundled reference data. Coverage varies by city and data can be stale. The UI says so and labels unknown prices "price not listed" instead of guessing. Live occupancy depends on a feed existing for that city (ParkenDD covers many German cities).
-- Transit uses DB HAFAS: excellent for Germany, long-distance only elsewhere in Europe. Other regions need a Google Maps key for in-app transit routes, or use the Google Maps link.
+- Transit uses Transitous, a community-run open-data service. Coverage and realtime depend on each region's published feeds; with a Google Maps key the planner falls back to Google Directions, and every screen links to Google Maps.
 - Browsers can't write directly to the camera roll. Saving goes through the share sheet or a download.
 - Speech recognition depends on the browser (Chrome, Edge, Safari). `navigator.vibrate` is ignored on iOS.
 - Emergency numbers are reference data. Check them locally on arrival.

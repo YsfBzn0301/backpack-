@@ -28,7 +28,7 @@ import { ScannerSheet } from '@/modules/scanner/ScannerSheet'
 import { CameraScreen } from '@/modules/camera/CameraScreen'
 import { QuickTour, tourDone } from '@/help/QuickTour'
 
-// Heavier modules load on first open: maps SDK bindings, HAFAS client, Three.js.
+// Heavier modules load on first open: maps SDK bindings, transit client, Three.js.
 const MapModule = lazy(() => import('@/modules/map/MapModule').then((m) => ({ default: m.MapModule })))
 const TransitModule = lazy(() => import('@/modules/transit/TransitModule').then((m) => ({ default: m.TransitModule })))
 const AudioScout = lazy(() => import('@/modules/audio/AudioScout').then((m) => ({ default: m.AudioScout })))

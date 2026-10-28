@@ -1,15 +1,14 @@
 /**
- * Public transit via HAFAS (Deutsche Bahn, through the keyless
- * v6.db.transport.rest gateway): nearby stops, live departure boards with
- * platforms and delays, and journey planning. Covers German local transit
- * (S/U-Bahn, tram, bus, ferry) and long-distance rail across Europe.
- * Outside that coverage the UI falls back to Google Transit.
+ * Public transit via Transitous (https://transitous.org): a free, keyless,
+ * community-run MOTIS 2 server built on open GTFS data with realtime feeds
+ * for most of Europe and many regions worldwide. Nearby stops, live
+ * departure boards with platforms and delays, and journey planning.
+ * Google Directions (with a Maps key) and a Google Maps link are fallbacks.
  */
 import { loc } from '@/i18n/format'
 import { settings } from '@/lib/settings'
 
-const BASE = 'https://v6.db.transport.rest'
-
+const BASE = 'https://api.transitous.org'
 export type Mode = 'express' | 'regional' | 'suburban' | 'subway' | 'tram' | 'bus' | 'ferry' | 'taxi' | 'walk' | 'other'
 
 export interface Stop {
@@ -81,143 +80,236 @@ export interface Place {
   kind: 'stop' | 'address' | 'poi'
 }
 
-const PRODUCT_MODE: Record<string, Mode> = {
-  nationalExpress: 'express',
-  national: 'express',
-  regionalExpress: 'regional',
-  regional: 'regional',
-  suburban: 'suburban',
-  subway: 'subway',
-  tram: 'tram',
-  bus: 'bus',
-  ferry: 'ferry',
-  taxi: 'taxi',
+const MODE: Record<string, Mode> = {
+  HIGHSPEED_RAIL: 'express',
+  LONG_DISTANCE: 'express',
+  NIGHT_RAIL: 'express',
+  REGIONAL_FAST_RAIL: 'regional',
+  REGIONAL_RAIL: 'regional',
+  RAIL: 'regional',
+  SUBURBAN: 'suburban',
+  METRO: 'suburban', // API v4 name for SUBURBAN
+  SUBWAY: 'subway',
+  TRAM: 'tram',
+  CABLE_CAR: 'tram',
+  FUNICULAR: 'tram',
+  BUS: 'bus',
+  COACH: 'bus',
+  FERRY: 'ferry',
+  WALK: 'walk',
+}
+const modeOf = (m?: string): Mode => MODE[m ?? ''] ?? 'other'
+
+const lang = () => settings.get().uiLang || 'en'
+const TIMEOUT_MS = 12_000
+
+function withTimeout(signal?: AbortSignal) {
+  const t = AbortSignal.timeout?.(TIMEOUT_MS)
+  if (!t) return signal
+  return signal && 'any' in AbortSignal ? AbortSignal.any([signal, t]) : (signal ?? t)
 }
 
-const lang = () => (settings.get().uiLang === 'de' ? 'de' : 'en')
-
-async function get<T>(path: string, params: Record<string, string | number | boolean | undefined>, signal?: AbortSignal): Promise<T> {
+async function request<T>(path: string, params: Record<string, string | number | boolean | undefined>, signal?: AbortSignal): Promise<T> {
   const q = new URLSearchParams()
-  for (const [k, v] of Object.entries(params)) if (v !== undefined) q.set(k, String(v))
-  const res = await fetch(`${BASE}${path}?${q}`, { signal, headers: { Accept: 'application/json' } })
-  if (!res.ok) throw new Error(res.status === 503 || res.status === 502 ? 'transit-busy' : `transit-${res.status}`)
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') q.set(k, String(v))
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}?${q}`, { signal: withTimeout(signal), headers: { Accept: 'application/json' } })
+  } catch (e) {
+    if (signal?.aborted) throw e
+    throw new Error('transit-unreachable')
+  }
+  if (!res.ok) {
+    const err = new Error(res.status === 429 || res.status >= 500 ? 'transit-busy' : `transit-${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
   return res.json()
 }
 
-type RawProducts = Record<string, boolean>
-type RawStop = { id: string; name: string; location?: { latitude: number; longitude: number }; products?: RawProducts; distance?: number; type?: string }
-type RawLine = { name?: string; product?: string; productName?: string; mode?: string }
-type RawRemark = { type?: string; text?: string; summary?: string }
+/**
+ * MOTIS versions some endpoints (/api/v5/plan …). Try the versions we
+ * understand, newest-compatible first, and remember the one the server has.
+ */
+const working = new Map<string, string>()
+async function versioned<T>(endpoint: string, versions: string[], params: Record<string, string | number | boolean | undefined>, signal?: AbortSignal): Promise<T> {
+  const known = working.get(endpoint)
+  const order = known ? [known, ...versions.filter((v) => v !== known)] : versions
+  let last: unknown
+  for (const v of order) {
+    try {
+      const r = await request<T>(`/api/${v}/${endpoint}`, params, signal)
+      working.set(endpoint, v)
+      return r
+    } catch (e) {
+      last = e
+      if ((e as { status?: number }).status !== 404) throw e
+    }
+  }
+  throw last
+}
 
-const modesOf = (p?: RawProducts) => Object.entries(p ?? {}).filter(([, v]) => v).map(([k]) => PRODUCT_MODE[k] ?? 'other')
-const lineOf = (l?: RawLine): Line | undefined =>
-  l ? { name: l.name?.trim() || l.productName || '', mode: PRODUCT_MODE[l.product ?? ''] ?? (l.mode === 'walking' ? 'walk' : 'other'), product: l.productName } : undefined
-const remarksOf = (r?: RawRemark[]): Remark[] =>
-  (r ?? [])
-    .filter((x) => x.text && x.type !== 'hint')
-    .map((x): Remark => ({ type: x.type === 'warning' ? 'warning' : x.type === 'status' ? 'status' : 'hint', text: (x.summary ? `${x.summary}: ` : '') + x.text! }))
-    .slice(0, 3)
+type RawAlert = { headerText?: string; descriptionText?: string }
+type RawPlace = {
+  name: string
+  stopId?: string
+  lat: number
+  lon: number
+  arrival?: string
+  departure?: string
+  scheduledArrival?: string
+  scheduledDeparture?: string
+  track?: string
+  scheduledTrack?: string
+  cancelled?: boolean
+  alerts?: RawAlert[]
+  modes?: string[]
+}
+
 const ms = (s?: string | null) => (s ? Date.parse(s) : null)
-const delay = (sec?: number | null) => (sec == null ? null : Math.round(sec / 60))
+const minutesLate = (actual?: string, planned?: string) => {
+  const a = ms(actual)
+  const p = ms(planned)
+  return a != null && p != null ? Math.round((a - p) / 60_000) : null
+}
+const remarksOf = (alerts?: RawAlert[]): Remark[] =>
+  (alerts ?? [])
+    .filter((a) => a.headerText || a.descriptionText)
+    .map((a): Remark => ({ type: 'warning', text: [a.headerText, a.descriptionText].filter(Boolean).join(': ') }))
+    .slice(0, 3)
+
+const toRad = (d: number) => (d * Math.PI) / 180
+const meters = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const x = toRad(b.lng - a.lng) * Math.cos(toRad((a.lat + b.lat) / 2))
+  const y = toRad(b.lat - a.lat)
+  return Math.round(Math.sqrt(x * x + y * y) * 6_371_000)
+}
 
 export async function nearbyStops(lat: number, lng: number, signal?: AbortSignal): Promise<Stop[]> {
-  const rows = await get<RawStop[]>('/locations/nearby', { latitude: lat, longitude: lng, results: 10, distance: 2000, poi: false, addresses: false, language: lang() }, signal)
-  return rows
-    .filter((r) => r.location)
-    .map((r) => ({ id: r.id, name: r.name, lat: r.location!.latitude, lng: r.location!.longitude, distance: r.distance, modes: modesOf(r.products) }))
+  for (const radius of [800, 2000]) {
+    const dLat = radius / 111_320
+    const dLng = dLat / Math.max(0.2, Math.cos(toRad(lat)))
+    const rows = await versioned<RawPlace[]>('map/stops', ['v1', 'v6'], { min: `${lat - dLat},${lng - dLng}`, max: `${lat + dLat},${lng + dLng}`, language: lang() }, signal)
+    // One entry per station: platforms share a name, keep the closest.
+    const byName = new Map<string, Stop>()
+    for (const r of rows) {
+      if (!r.stopId) continue
+      const stop: Stop = { id: r.stopId, name: r.name, lat: r.lat, lng: r.lon, distance: meters({ lat, lng }, { lat: r.lat, lng: r.lon }), modes: [...new Set((r.modes ?? []).map(modeOf))] }
+      const prev = byName.get(r.name)
+      if (!prev) byName.set(r.name, stop)
+      else {
+        const modes = [...new Set([...prev.modes, ...stop.modes])]
+        byName.set(r.name, (stop.distance ?? 0) < (prev.distance ?? 0) ? { ...stop, modes } : { ...prev, modes })
+      }
+    }
+    const list = [...byName.values()].filter((s) => (s.distance ?? 0) <= radius * 1.2).sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
+    if (list.length) return list.slice(0, 10)
+  }
+  return []
 }
 
 export async function departures(stopId: string, signal?: AbortSignal): Promise<{ list: Departure[]; updatedAt: number }> {
-  type Raw = { departures?: RawDep[]; realtimeDataUpdatedAt?: number }
-  type RawDep = { tripId: string; when: string | null; plannedWhen: string; delay: number | null; platform?: string | null; plannedPlatform?: string | null; direction?: string; line?: RawLine; cancelled?: boolean; remarks?: RawRemark[] }
-  const r = await get<Raw | RawDep[]>(`/stops/${encodeURIComponent(stopId)}/departures`, { duration: 90, results: 40, remarks: true, language: lang() }, signal)
-  const rows = Array.isArray(r) ? r : (r.departures ?? [])
+  type RawStopTime = {
+    place: RawPlace
+    mode: string
+    realTime: boolean
+    headsign: string
+    tripTo?: { name: string }
+    tripId: string
+    routeShortName?: string
+    displayName?: string
+    cancelled?: boolean
+    tripCancelled?: boolean
+    pickupDropoffType?: string
+  }
+  const r = await versioned<{ stopTimes: RawStopTime[] }>('stoptimes', ['v5', 'v6', 'v4', 'v1'], { stopId, n: 40, language: lang() }, signal)
   return {
-    updatedAt: (!Array.isArray(r) && r.realtimeDataUpdatedAt ? r.realtimeDataUpdatedAt * 1000 : Date.now()),
-    list: rows.map((d) => ({
-      id: `${d.tripId}-${d.plannedWhen}`,
-      when: ms(d.when),
-      plannedWhen: ms(d.plannedWhen) ?? Date.now(),
-      delayMin: delay(d.delay),
-      platform: d.platform ?? undefined,
-      plannedPlatform: d.plannedPlatform ?? undefined,
-      direction: d.direction ?? '',
-      line: lineOf(d.line) ?? { name: '?', mode: 'other' },
-      cancelled: Boolean(d.cancelled),
-      remarks: remarksOf(d.remarks),
-    })),
+    updatedAt: Date.now(),
+    list: (r.stopTimes ?? [])
+      .filter((d) => d.place.scheduledDeparture && d.pickupDropoffType !== 'NOT_ALLOWED')
+      .map((d) => {
+        const planned = d.place.scheduledDeparture!
+        return {
+          id: `${d.tripId}-${planned}`,
+          when: d.realTime ? ms(d.place.departure) : null,
+          plannedWhen: ms(planned) ?? Date.now(),
+          delayMin: d.realTime ? minutesLate(d.place.departure, planned) : null,
+          platform: d.place.track || undefined,
+          plannedPlatform: d.place.scheduledTrack || undefined,
+          direction: d.headsign || d.tripTo?.name || '',
+          line: { name: d.displayName || d.routeShortName || '?', mode: modeOf(d.mode) },
+          cancelled: Boolean(d.cancelled || d.tripCancelled || d.place.cancelled),
+          remarks: remarksOf(d.place.alerts),
+        }
+      }),
   }
 }
 
 export async function searchLocations(query: string, near?: { lat: number; lng: number }, signal?: AbortSignal): Promise<Place[]> {
-  type Raw = { type: string; id?: string; name?: string; address?: string; latitude?: number; longitude?: number; location?: { latitude: number; longitude: number } }
-  const rows = await get<Raw[]>('/locations', { query, results: 8, stops: true, addresses: true, poi: true, fuzzy: true, language: lang(), ...(near ? {} : {}) }, signal)
-  return rows.map((r) => ({
-    id: r.type === 'stop' || r.type === 'station' ? r.id : undefined,
-    name: r.name ?? r.address ?? '',
-    lat: r.location?.latitude ?? r.latitude,
-    lng: r.location?.longitude ?? r.longitude,
-    kind: r.type === 'stop' || r.type === 'station' ? 'stop' : r.type === 'location' && r.address ? 'address' : 'poi',
-  }))
+  type Match = { type: 'STOP' | 'ADDRESS' | 'PLACE'; id: string; name: string; lat: number; lon: number; houseNumber?: string; areas?: { name: string; default?: boolean }[] }
+  const rows = await request<Match[]>('/api/v1/geocode', { text: query, language: lang(), place: near ? `${near.lat},${near.lng}` : undefined, numResults: 8 }, signal)
+  return rows.map((r) => {
+    const area = r.areas?.find((a) => a.default)?.name
+    const base = r.type === 'ADDRESS' && r.houseNumber && !r.name.includes(r.houseNumber) ? `${r.name} ${r.houseNumber}` : r.name
+    return {
+      id: r.type === 'STOP' ? r.id : undefined,
+      name: area && !base.includes(area) ? `${base}, ${area}` : base,
+      lat: r.lat,
+      lng: r.lon,
+      kind: r.type === 'STOP' ? 'stop' : r.type === 'ADDRESS' ? 'address' : 'poi',
+    }
+  })
 }
 
-function placeParams(prefix: 'from' | 'to', p: Place) {
-  if (p.id) return { [prefix]: p.id }
-  return { [`${prefix}.latitude`]: p.lat, [`${prefix}.longitude`]: p.lng, [`${prefix}.address`]: p.name || 'Location' }
-}
+const placeParam = (p: Place) => p.id ?? `${p.lat},${p.lng}`
 
 export async function journeys(from: Place, to: Place, departure: Date, signal?: AbortSignal): Promise<Journey[]> {
   type RawLeg = {
-    origin?: { name?: string; address?: string }
-    destination?: { name?: string; address?: string }
-    departure: string
-    plannedDeparture: string
-    departureDelay?: number | null
-    departurePlatform?: string | null
-    arrival: string
-    plannedArrival: string
-    arrivalDelay?: number | null
-    arrivalPlatform?: string | null
-    line?: RawLine
-    direction?: string
-    walking?: boolean
+    mode: string
+    from: RawPlace
+    to: RawPlace
+    startTime: string
+    endTime: string
+    scheduledStartTime: string
+    scheduledEndTime: string
+    realTime: boolean
     distance?: number
+    headsign?: string
+    routeShortName?: string
+    displayName?: string
     cancelled?: boolean
-    remarks?: RawRemark[]
+    alerts?: RawAlert[]
   }
-  type Raw = { journeys?: { legs: RawLeg[]; refreshToken?: string; price?: { amount: number; currency: string } | null }[] }
-  const r = await get<Raw>(
-    '/journeys',
-    { ...placeParams('from', from), ...placeParams('to', to), departure: departure.toISOString(), results: 6, stopovers: false, remarks: true, language: lang() },
-    signal,
-  )
-  return (r.journeys ?? []).map((j, i) => {
-    const legs: Leg[] = j.legs.map((l) => ({
-      origin: l.origin?.name ?? l.origin?.address ?? '',
-      destination: l.destination?.name ?? l.destination?.address ?? '',
-      departure: ms(l.departure) ?? ms(l.plannedDeparture)!,
-      plannedDeparture: ms(l.plannedDeparture)!,
-      departureDelayMin: delay(l.departureDelay),
-      departurePlatform: l.departurePlatform ?? undefined,
-      arrival: ms(l.arrival) ?? ms(l.plannedArrival)!,
-      plannedArrival: ms(l.plannedArrival)!,
-      arrivalDelayMin: delay(l.arrivalDelay),
-      arrivalPlatform: l.arrivalPlatform ?? undefined,
-      line: lineOf(l.line),
-      direction: l.direction,
-      walking: Boolean(l.walking),
-      distance: l.distance,
-      cancelled: Boolean(l.cancelled),
-      remarks: remarksOf(l.remarks),
-    }))
-    const rides = legs.filter((l) => !l.walking)
+  type Raw = { itineraries?: { id?: string; startTime: string; endTime: string; transfers: number; legs: RawLeg[] }[] }
+  const r = await versioned<Raw>('plan', ['v5', 'v6', 'v4', 'v3'], { fromPlace: placeParam(from), toPlace: placeParam(to), time: departure.toISOString(), numItineraries: 5, language: lang() }, signal)
+  return (r.itineraries ?? []).map((j, i) => {
+    const legs: Leg[] = j.legs.map((l) => {
+      const walking = ['WALK', 'BIKE', 'CAR', 'RENTAL'].includes(l.mode)
+      return {
+        origin: l.from.name === 'START' ? from.name : l.from.name,
+        destination: l.to.name === 'END' ? to.name : l.to.name,
+        departure: ms(l.startTime)!,
+        plannedDeparture: ms(l.scheduledStartTime) ?? ms(l.startTime)!,
+        departureDelayMin: l.realTime ? minutesLate(l.startTime, l.scheduledStartTime) : null,
+        departurePlatform: l.from.track || l.from.scheduledTrack || undefined,
+        arrival: ms(l.endTime)!,
+        plannedArrival: ms(l.scheduledEndTime) ?? ms(l.endTime)!,
+        arrivalDelayMin: l.realTime ? minutesLate(l.endTime, l.scheduledEndTime) : null,
+        arrivalPlatform: l.to.track || l.to.scheduledTrack || undefined,
+        line: walking ? undefined : { name: l.displayName || l.routeShortName || '', mode: modeOf(l.mode) },
+        direction: l.headsign,
+        walking,
+        distance: l.distance,
+        cancelled: Boolean(l.cancelled),
+        remarks: remarksOf(l.alerts),
+      }
+    })
     return {
-      id: j.refreshToken ?? String(i),
+      id: j.id ?? `${i}-${j.startTime}`,
       legs,
-      departure: legs[0].departure,
-      arrival: legs[legs.length - 1].arrival,
-      transfers: Math.max(0, rides.length - 1),
-      price: j.price ?? undefined,
+      departure: ms(j.startTime)!,
+      arrival: ms(j.endTime)!,
+      transfers: j.transfers,
     }
   })
 }
@@ -231,7 +323,7 @@ export function googleTransitUrl(from: Place | null, to: Place) {
 
 /**
  * Google Directions (transit) through the Maps JS SDK when a key is loaded,
- * for regions HAFAS doesn't cover.
+ * when Transitous has no route.
  */
 export async function googleJourneys(from: { lat: number; lng: number }, to: Place, departure: Date): Promise<Journey[]> {
   const svc = new google.maps.DirectionsService()
@@ -279,8 +371,3 @@ export async function googleJourneys(from: { lat: number; lng: number }, to: Pla
     }
   })
 }
-
-/** Countries where HAFAS (DB) has good local coverage. */
-export const HAFAS_LOCAL = new Set(['DE'])
-/** Long-distance rail coverage through DB HAFAS. */
-export const HAFAS_EUROPE = new Set(['DE', 'AT', 'CH', 'NL', 'BE', 'LU', 'FR', 'DK', 'PL', 'CZ', 'IT', 'HU', 'SK', 'SI', 'HR'])

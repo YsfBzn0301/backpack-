@@ -1,19 +1,17 @@
 /**
  * Public transit (ÖPNV): live departure boards for nearby stations and a
- * journey planner, via HAFAS (DB). Google Transit covers everywhere else.
+ * journey planner, via Transitous (open data). Google Transit is the fallback.
  */
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, ArrowDownUp, ChevronDown, ExternalLink, Footprints, Loader2, MapPin, RefreshCw, Search, TramFront, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAgentState } from '@/agents/host'
-import type { SafetyState } from '@/agents/safety.worker'
 import { activeCoords, location } from '@/lib/location'
 import { createStore } from '@/lib/store'
 import { haptic } from '@/lib/haptics'
 import { fmtClock, fmtDistance, fmtDuration, fmtMoney, relativeTime } from '@/i18n/format'
-import { departures, googleJourneys, googleTransitUrl, HAFAS_EUROPE, journeys, nearbyStops, searchLocations, type Departure, type Journey, type Leg, type Line, type Mode, type Place, type Stop } from '@/services/transit'
+import { departures, googleJourneys, googleTransitUrl, journeys, nearbyStops, searchLocations, type Departure, type Journey, type Leg, type Line, type Mode, type Place, type Stop } from '@/services/transit'
 import { useMapsLoader } from '@/hooks/useMapsLoader'
 import { useOnline } from '@/hooks/useOnline'
 import { Segmented } from '@/components/ui/Segmented'
@@ -299,23 +297,27 @@ function RoutePlanner() {
   const { t } = useTranslation()
   const loc = location.use()
   const { coords } = activeCoords(loc)
-  const safety = useAgentState<SafetyState>('safety')
-  const country = safety?.country.code ?? 'XX'
   const maps = useMapsLoader()
   const [from, setFrom] = useState<Place | null>(null)
   const [to, setTo] = useState<Place | null>(null)
   const [when, setWhen] = useState<string>('')
   const [submitted, setSubmitted] = useState(0)
   const origin = from ?? (coords ? { name: t('transit.myLocation'), lat: coords.lat, lng: coords.lng, kind: 'address' as const } : null)
-  // HAFAS for Europe; Google Directions elsewhere when a Maps key is loaded.
-  const useGoogle = !HAFAS_EUROPE.has(country) && maps === 'ready'
-
   const results = useQuery({
-    queryKey: ['transit-journeys', origin?.id ?? `${origin?.lat},${origin?.lng}`, to?.id ?? to?.name, when, submitted, useGoogle],
+    queryKey: ['transit-journeys', origin?.id ?? `${origin?.lat},${origin?.lng}`, to?.id ?? to?.name, when, submitted, maps],
     enabled: Boolean(origin && to && submitted),
-    queryFn: ({ signal }) => {
+    // Transitous first; Google Directions when it fails or finds nothing and a Maps key is loaded.
+    queryFn: async ({ signal }) => {
       const dep = when ? new Date(when) : new Date()
-      return useGoogle && origin?.lat != null ? googleJourneys({ lat: origin.lat, lng: origin.lng! }, to!, dep) : journeys(origin!, to!, dep, signal)
+      const google = () => googleJourneys({ lat: origin!.lat!, lng: origin!.lng! }, to!, dep).then((list) => ({ list, google: true }))
+      const canGoogle = maps === 'ready' && origin?.lat != null
+      try {
+        const list = await journeys(origin!, to!, dep, signal)
+        return list.length || !canGoogle ? { list, google: false } : await google()
+      } catch (e) {
+        if (canGoogle) return google()
+        throw e
+      }
     },
     staleTime: 60_000,
     retry: 0,
@@ -374,9 +376,9 @@ function RoutePlanner() {
           )}
         </div>
       ) : results.data ? (
-        results.data.length ? (
+        results.data.list.length ? (
           <ul className="space-y-2">
-            {results.data.map((j) => (
+            {results.data.list.map((j) => (
               <JourneyCard key={j.id} j={j} />
             ))}
           </ul>
@@ -390,7 +392,7 @@ function RoutePlanner() {
           <ExternalLink size={13} /> {t('transit.openGoogle')}
         </a>
       )}
-      <p className="px-1 text-[10px] text-fog-500">{useGoogle ? t('transit.creditGoogle') : t('transit.credit')}</p>
+      <p className="px-1 text-[10px] text-fog-500">{results.data?.google ? t('transit.creditGoogle') : t('transit.credit')}</p>
     </div>
   )
 }
