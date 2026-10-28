@@ -6,19 +6,21 @@ import type { Place, PlaceKind } from '@/agents/protocol'
 import { hasMapsKey, loadGoogleMaps } from './maps-loader'
 import { distance } from '@/lib/geo'
 
-export const KIND_META: Record<PlaceKind, { label: string; google: string[]; osm: string[] }> = {
-  atm: { label: 'ATM', google: ['atm'], osm: ['amenity=atm', 'amenity=bank'] },
-  hostel: { label: 'Hostel', google: ['hostel'], osm: ['tourism=hostel', 'tourism=guest_house'] },
-  street_food: { label: 'Street food', google: ['fast_food_restaurant', 'food_court', 'meal_takeaway'], osm: ['amenity=fast_food', 'amenity=food_court'] },
-  restaurant: { label: 'Restaurant', google: ['restaurant'], osm: ['amenity=restaurant'] },
-  cafe: { label: 'Café', google: ['cafe', 'coffee_shop'], osm: ['amenity=cafe'] },
-  convenience: { label: 'Convenience', google: ['convenience_store', 'supermarket'], osm: ['shop=convenience', 'shop=supermarket'] },
-  bar: { label: 'Bar', google: ['bar', 'pub'], osm: ['amenity=bar', 'amenity=pub'] },
-  pharmacy: { label: 'Pharmacy', google: ['pharmacy', 'drugstore'], osm: ['amenity=pharmacy'] },
-  hospital: { label: 'Hospital', google: ['hospital'], osm: ['amenity=hospital', 'amenity=clinic'] },
-  bus: { label: 'Bus terminal', google: ['bus_station', 'transit_station'], osm: ['amenity=bus_station', 'public_transport=station'] },
-  embassy: { label: 'Embassy', google: ['embassy'], osm: ['office=diplomatic', 'amenity=embassy'] },
-  police: { label: 'Police', google: ['police'], osm: ['amenity=police'] },
+export const KIND_META: Record<PlaceKind, { google: string[]; osm: string[] }> = {
+  atm: { google: ['atm'], osm: ['amenity=atm', 'amenity=bank'] },
+  hostel: { google: ['hostel'], osm: ['tourism=hostel', 'tourism=guest_house'] },
+  street_food: { google: ['fast_food_restaurant', 'food_court', 'meal_takeaway'], osm: ['amenity=fast_food', 'amenity=food_court'] },
+  restaurant: { google: ['restaurant'], osm: ['amenity=restaurant'] },
+  cafe: { google: ['cafe', 'coffee_shop'], osm: ['amenity=cafe'] },
+  convenience: { google: ['convenience_store', 'supermarket'], osm: ['shop=convenience', 'shop=supermarket'] },
+  bar: { google: ['bar', 'pub'], osm: ['amenity=bar', 'amenity=pub'] },
+  pharmacy: { google: ['pharmacy', 'drugstore'], osm: ['amenity=pharmacy'] },
+  hospital: { google: ['hospital'], osm: ['amenity=hospital', 'amenity=clinic'] },
+  bus: { google: ['bus_station', 'transit_station'], osm: ['amenity=bus_station', 'public_transport=station'] },
+  embassy: { google: ['embassy'], osm: ['office=diplomatic', 'amenity=embassy'] },
+  police: { google: ['police'], osm: ['amenity=police'] },
+  fuel: { google: ['gas_station'], osm: ['amenity=fuel'] },
+  parking: { google: ['parking'], osm: ['amenity=parking'] },
 }
 
 interface Query {
@@ -149,7 +151,7 @@ async function osmNearby(q: Query): Promise<Place[]> {
     }))
     if (!kind) continue
     if (kind === 'atm' && t.amenity === 'bank' && t.atm !== 'yes') continue
-    const name = t['name:en'] || t.name || t.brand || KIND_META[kind].label
+    const name = t['name:en'] || t.name || t.brand || ''
     out.push({
       id: `osm-${el.type}-${el.id}`,
       name,

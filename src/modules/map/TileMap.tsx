@@ -1,5 +1,6 @@
 import { Minus, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Lightweight slippy map (no SDK) on CARTO dark tiles over OpenStreetMap data.
@@ -33,6 +34,7 @@ export function TileMap({
   radius,
   onBackgroundClick,
   recenterKey,
+  theme = 'dark',
 }: {
   center: { lat: number; lng: number }
   zoom?: number
@@ -40,14 +42,16 @@ export function TileMap({
   radius?: { lat: number; lng: number; meters: number }
   onBackgroundClick?: () => void
   recenterKey?: string
+  theme?: 'dark' | 'light'
 }) {
+  const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 360, h: 320 })
   const [view, setView] = useState({ ...center, z: initialZoom })
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null)
 
   useEffect(() => {
-    setView((v) => ({ ...v, lat: center.lat, lng: center.lng }))
+    setView({ lat: center.lat, lng: center.lng, z: initialZoom })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recenterKey])
 
@@ -75,10 +79,10 @@ export function TileMap({
         if (ty < 0 || ty >= n) continue
         const wx = ((tx % n) + n) % n
         const sub = 'abcd'[(wx + ty) % 4]
-        out.push({ key: `${view.z}/${tx}/${ty}`, x: tx * TILE - origin.x, y: ty * TILE - origin.y, url: `https://${sub}.basemaps.cartocdn.com/dark_all/${view.z}/${wx}/${ty}${dpr}.png` })
+        out.push({ key: `${view.z}/${tx}/${ty}`, x: tx * TILE - origin.x, y: ty * TILE - origin.y, url: `https://${sub}.basemaps.cartocdn.com/${theme === 'light' ? 'rastertiles/voyager' : 'dark_all'}/${view.z}/${wx}/${ty}${dpr}.png` })
       }
     return out
-  }, [origin.x, origin.y, size.w, size.h, view.z])
+  }, [origin.x, origin.y, size.w, size.h, view.z, theme])
 
   const zoomBy = (d: number) => setView((v) => ({ ...v, z: Math.max(3, Math.min(19, v.z + d)) }))
 
@@ -106,7 +110,7 @@ export function TileMap({
   return (
     <div
       ref={ref}
-      className="relative h-full w-full touch-none overflow-hidden bg-[#0e1116] select-none"
+      className={`relative h-full w-full touch-none overflow-hidden select-none ${theme === 'light' ? 'bg-[#eae8e1]' : 'bg-[#0e1116]'}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -132,11 +136,11 @@ export function TileMap({
         )
       })}
       <div className="absolute top-3 right-3 flex flex-col overflow-hidden rounded-xl glass" onPointerDown={(e) => e.stopPropagation()}>
-        <button onClick={() => zoomBy(1)} className="grid h-9 w-9 place-items-center text-fog-100 hover:bg-white/5" aria-label="Zoom in">
+        <button onClick={() => zoomBy(1)} className="grid h-9 w-9 place-items-center text-fog-100 hover:bg-veil/5" aria-label={t('map.zoomIn')}>
           <Plus size={16} />
         </button>
-        <div className="h-px bg-white/10" />
-        <button onClick={() => zoomBy(-1)} className="grid h-9 w-9 place-items-center text-fog-100 hover:bg-white/5" aria-label="Zoom out">
+        <div className="h-px bg-veil/10" />
+        <button onClick={() => zoomBy(-1)} className="grid h-9 w-9 place-items-center text-fog-100 hover:bg-veil/5" aria-label={t('map.zoomOut')}>
           <Minus size={16} />
         </button>
       </div>

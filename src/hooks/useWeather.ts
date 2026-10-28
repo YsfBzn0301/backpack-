@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchWeather } from '@/services/weather'
 import type { Coords } from '@/agents/protocol'
-import { keys } from '@/lib/settings'
+import { keys, settings } from '@/lib/settings'
 
 export function useWeather(coords: Coords | null) {
   // Round to ~1 km so small GPS moves reuse the cached forecast.
   const lat = coords ? Math.round(coords.lat * 100) / 100 : null
   const lng = coords ? Math.round(coords.lng * 100) / 100 : null
+  // OpenWeather returns localised descriptions, so the language is part of the key.
+  const lang = settings.use((s) => (keys.openWeather() ? s.uiLang : 'any'))
   return useQuery({
-    queryKey: ['weather', lat, lng, Boolean(keys.openWeather())],
-    queryFn: () => fetchWeather(lat!, lng!),
+    queryKey: ['weather', lat, lng, Boolean(keys.openWeather()), lang],
+    queryFn: () => fetchWeather(lat!, lng!, lang === 'any' ? 'en' : lang),
     enabled: lat != null && lng != null,
     staleTime: 15 * 60_000,
     gcTime: 24 * 3600_000,

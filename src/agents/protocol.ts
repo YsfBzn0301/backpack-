@@ -7,6 +7,30 @@
  */
 export type AgentName = 'scout' | 'translate' | 'budget' | 'safety'
 
+/**
+ * Agents never produce finished sentences. They emit translation keys plus
+ * typed variables; the UI renders them in the current language and units.
+ */
+export type MsgVar =
+  | string
+  | number
+  | Msg
+  | { t: 'time'; ts: number; off: number }
+  | { t: 'dist'; m: number }
+  | { t: 'money'; amount: number; cur: string }
+  | { t: 'country'; code: string }
+  | { t: 'lang'; code: string }
+  | { t: 'temp'; c: number }
+  | { t: 'dur'; min: number }
+  /** An opening_hours-style window, shown with localised weekday names. */
+  | { t: 'hours'; spec: string }
+  | { t: 'list'; items: MsgVar[] }
+export interface Msg {
+  k: string
+  v?: Record<string, MsgVar>
+}
+export const msg = (k: string, v?: Record<string, MsgVar>): Msg => (v ? { k, v } : { k })
+
 export type WeatherKind = 'clear' | 'clouds' | 'rain' | 'drizzle' | 'thunder' | 'snow' | 'mist'
 
 export interface Coords {
@@ -24,13 +48,19 @@ export interface AgentContext {
   countryHint?: string
   /** Country resolved by SafetyAgent. Other agents should prefer this. */
   country?: string
-  weather?: { tempC: number; kind: WeatherKind; description: string; humidity: number; isDay: boolean }
+  weather?: { tempC: number; kind: WeatherKind; description: string; wmo?: number; humidity: number; isDay: boolean }
   /** UTC offset of the context location, seconds. */
   utcOffsetSec: number
   online: boolean
   homeCurrency: string
   homeCountry: string
   radius: number
+  /** UI language; agents only use it for things like translator defaults. */
+  lang: string
+  /** Road-trip mode: Scout also scouts parking, Budget watches parking costs. */
+  driving: boolean
+  vehicleHeightM: number
+  parkingBudgetDaily: number
   now: number
 }
 
@@ -47,6 +77,8 @@ export type PlaceKind =
   | 'bus'
   | 'embassy'
   | 'police'
+  | 'fuel'
+  | 'parking'
 
 export interface Place {
   id: string
@@ -63,8 +95,8 @@ export interface Place {
 }
 
 export interface InsightAction {
-  label: string
-  type: 'tab' | 'sos' | 'directions' | 'place'
+  label: Msg
+  type: 'tab' | 'screen' | 'sos' | 'directions' | 'place' | 'parking'
   payload?: unknown
 }
 
@@ -72,8 +104,8 @@ export interface Insight {
   id: string
   agent: AgentName
   kind: 'suggestion' | 'alert' | 'info' | 'deal'
-  title: string
-  body: string
+  title: Msg
+  body: Msg
   /** 0 = low … 3 = urgent */
   priority: 0 | 1 | 2 | 3
   ts: number
@@ -84,8 +116,57 @@ export interface Insight {
   action?: InsightAction
 }
 
+export type ParkingType = 'garage' | 'underground' | 'surface' | 'street' | 'rooftop' | 'unknown'
+
+/** A time window in opening_hours syntax subset, e.g. "Mo-Sa 18:00-08:00; Su". */
+export type HoursSpec = string
+
+export interface ParkingRate {
+  amount: number
+  currency: string
+  /** Billing unit in minutes (60 = hourly, 1440 = daily, 0 = flat fee). */
+  unitMin: number
+  /** Only applies inside this window. */
+  when?: HoursSpec
+}
+
+export interface ParkingLot {
+  id: string
+  name: string
+  lat: number
+  lng: number
+  source: 'osm' | 'google' | 'parkendd' | 'custom'
+  type: ParkingType
+  /** true paid, false free, null unknown. */
+  fee: boolean | null
+  rates: ParkingRate[]
+  freeWhen?: HoursSpec
+  paidWhen?: HoursSpec
+  freeFirstMin?: number
+  maxStayMin?: number
+  maxStayWhen?: HoursSpec
+  disc?: boolean
+  capacity?: number
+  /** Live free spaces (where a real-time source exists). */
+  free?: number
+  liveAt?: number
+  state?: 'open' | 'closed' | 'unknown'
+  ev?: number | boolean
+  disabled?: number | boolean
+  maxHeightM?: number
+  payment: ('app' | 'machine' | 'cash' | 'card' | 'coins' | 'contactless')[]
+  hours?: HoursSpec
+  customersOnly?: boolean
+  operator?: string
+  website?: string
+  address?: string
+}
+
 export interface ToolCalls {
   'places.nearby': { args: { lat: number; lng: number; radius: number; kinds: PlaceKind[]; limit?: number }; result: Place[] }
+  'parking.nearby': { args: { lat: number; lng: number; radius: number; country?: string }; result: ParkingLot[] }
+  /** Ask another agent to run a task; the host routes it. */
+  'agent.run': { args: { agent: AgentName; task: string; payload?: unknown }; result: unknown }
 }
 export type ToolName = keyof ToolCalls
 

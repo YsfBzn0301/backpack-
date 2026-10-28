@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Wifi, WifiOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useOnline } from '@/hooks/useOnline'
 import { haptic } from '@/lib/haptics'
 
 /** Slides in when the connection drops; briefly confirms when it's back. */
 export function OfflineBanner() {
+  const { t } = useTranslation()
   const online = useOnline()
   const [showBack, setShowBack] = useState(false)
   const wasOffline = useRef(!online)
@@ -39,10 +41,10 @@ export function OfflineBanner() {
         >
           <div
             role="status"
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium shadow-lg ${online ? 'bg-moss-400 text-ink-900' : 'bg-ink-700 text-fog-100 ring-1 ring-amber-glow/40'}`}
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium shadow-lg ${online ? 'bg-moss-400 text-onaccent' : 'bg-ink-700 text-fog-100 ring-1 ring-amber-glow/40'}`}
           >
             {online ? <Wifi size={14} /> : <WifiOff size={14} className="text-amber-glow" />}
-            {online ? 'Back online. Syncing.' : 'Offline. Rates, phrasebook, SOS and vault still work.'}
+            {online ? t('offline.back') : t('offline.offline')}
           </div>
         </motion.div>
       )}

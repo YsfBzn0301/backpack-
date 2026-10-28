@@ -7,23 +7,26 @@ import type { SafetyState } from '@/agents/safety.worker'
 import { addExpense, expenses, removeExpense } from '@/lib/expenses'
 import { useExchangeRates } from '@/hooks/useExchangeRates'
 import { settings } from '@/lib/settings'
-import { formatMoney, uid } from '@/lib/format'
-import { flag, getCountry } from '@/data/countries'
+import { uid } from '@/lib/format'
+import { countryName, fmtDate, fmtMoney as formatMoney } from '@/i18n/format'
+import { useTranslation } from 'react-i18next'
+import { flag } from '@/data/countries'
 import { haptic } from '@/lib/haptics'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 
-const CAT_META: Record<ExpenseCategory, { label: string; color: string }> = {
-  food: { label: 'Food & drink', color: '#ffb347' },
-  transport: { label: 'Transport', color: '#8fa8ff' },
-  stay: { label: 'Stay', color: '#b38cff' },
-  activities: { label: 'Activities', color: '#5fd39a' },
-  shopping: { label: 'Shopping', color: '#e57bb8' },
-  health: { label: 'Health', color: '#ff4d5e' },
-  connectivity: { label: 'SIM & data', color: '#6cb6ff' },
-  other: { label: 'Other', color: '#8b949e' },
+const CAT_COLOR: Record<ExpenseCategory, string> = {
+  food: '#ffb347',
+  transport: '#8fa8ff',
+  stay: '#b38cff',
+  activities: '#5fd39a',
+  shopping: '#e57bb8',
+  health: '#ff4d5e',
+  connectivity: '#6cb6ff',
+  other: '#8b949e',
 }
 
 export function ExpenseTracker() {
+  const { t } = useTranslation()
   const { items } = expenses.use()
   const home = settings.use((s) => s.homeCurrency)
   const { convert, localCurrency } = useExchangeRates()
@@ -38,7 +41,7 @@ export function ExpenseTracker() {
     const value = parseFloat(amount.replace(',', '.'))
     if (!value || value <= 0) return
     const category = await agents.run<ExpenseCategory>('budget', 'categorize', { text: note }).catch(() => 'other' as const)
-    addExpense({ id: uid(), amount: value, currency: cur, note: note.trim() || CAT_META[category].label, category, country, ts: Date.now() })
+    addExpense({ id: uid(), amount: value, currency: cur, note: note.trim() || t(`expenses.cat.${category}`), category, country, ts: Date.now() })
     setAmount('')
     setNote('')
     haptic('success')
@@ -79,14 +82,14 @@ export function ExpenseTracker() {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && add()}
-            placeholder="What for?"
+            placeholder={t('expenses.whatFor')}
             className="min-w-0 flex-1 rounded-xl bg-ink-900 px-3 py-2.5 text-sm outline-none hairline border focus:border-ember-500/40"
           />
         </div>
         <button onClick={add} disabled={!amount} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-fog-100 py-2.5 text-sm font-semibold text-ink-900 disabled:opacity-40">
-          <Plus size={15} /> Log expense
+          <Plus size={15} /> {t('expenses.log')}
         </button>
-        <p className="mt-2 text-[11px] text-fog-500">BudgetAgent files it by category and country: {getCountry(country)?.name ?? 'unknown location'}.</p>
+        <p className="mt-2 text-[11px] text-fog-500">{t('expenses.filedAs', { country: countryName(country) })}</p>
       </section>
 
       {byCountry.map(([code, g]) => {
@@ -96,13 +99,13 @@ export function ExpenseTracker() {
             <div className="flex items-end justify-between">
               <div>
                 <div className="text-xs text-fog-500">
-                  {code !== 'XX' && flag(code)} {getCountry(code)?.name ?? 'Unknown'}
+                  {code !== 'XX' && flag(code)} {countryName(code)}
                 </div>
                 <div className="tabular text-2xl font-light text-fog-50">{formatMoney(g.total, home)}</div>
               </div>
               <div className="text-right text-xs text-fog-500">
                 <div className="tabular text-fog-300">{formatMoney(g.total / g.days.size, home)}</div>
-                per day · {g.days.size} {g.days.size === 1 ? 'day' : 'days'}
+                {t('expenses.perDay', { count: g.days.size })}
               </div>
             </div>
             <div className="mt-3 space-y-1.5">
@@ -110,9 +113,9 @@ export function ExpenseTracker() {
                 .sort((a, b) => b[1] - a[1])
                 .map(([cat, v]) => (
                   <div key={cat} className="flex items-center gap-2 text-xs">
-                    <span className="w-24 shrink-0 text-fog-400">{CAT_META[cat].label}</span>
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/5">
-                      <motion.div className="h-full rounded-full" style={{ background: CAT_META[cat].color }} initial={{ width: 0 }} animate={{ width: `${(v / max) * 100}%` }} />
+                    <span className="w-24 shrink-0 truncate text-fog-400">{t(`expenses.cat.${cat}`)}</span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-veil/5">
+                      <motion.div className="h-full rounded-full" style={{ background: CAT_COLOR[cat] }} initial={{ width: 0 }} animate={{ width: `${(v / max) * 100}%` }} />
                     </div>
                     <span className="tabular w-20 shrink-0 text-right text-fog-300">{formatMoney(v, home)}</span>
                   </div>
@@ -124,23 +127,23 @@ export function ExpenseTracker() {
 
       {items.length > 0 && (
         <section>
-          <SectionTitle>Recent</SectionTitle>
-          <ul className="card divide-y divide-white/5">
+          <SectionTitle>{t('expenses.recent')}</SectionTitle>
+          <ul className="card divide-y divide-veil/5">
             <AnimatePresence initial={false}>
               {items.slice(0, 30).map((e) => (
                 <motion.li key={e.id} layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: CAT_META[e.category].color }} />
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: CAT_COLOR[e.category] }} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-fog-100">{e.note}</span>
                     <span className="block text-[11px] text-fog-500">
-                      {new Date(e.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })} · {CAT_META[e.category].label}
+                      {fmtDate(new Date(e.ts), { month: 'short', day: 'numeric' })} · {t(`expenses.cat.${e.category}`)}
                     </span>
                   </span>
                   <span className="tabular text-right text-sm">
                     <span className="block text-fog-100">{formatMoney(e.amount, e.currency)}</span>
                     {e.currency !== home && <span className="block text-[11px] text-fog-500">{formatMoney(convert(e.amount, e.currency, home), home)}</span>}
                   </span>
-                  <button onClick={() => removeExpense(e.id)} className="text-fog-500 hover:text-alert-500" aria-label="Delete expense">
+                  <button onClick={() => removeExpense(e.id)} className="text-fog-500 hover:text-alert-500" aria-label={t('expenses.delete')}>
                     <Trash2 size={14} />
                   </button>
                 </motion.li>

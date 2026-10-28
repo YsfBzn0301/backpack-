@@ -1,11 +1,21 @@
 import { createStore } from './store'
 
+export type UiLang = 'en' | 'de' | 'tr' | 'ru'
+
 export interface Settings {
+  uiLang: UiLang
+  theme: 'system' | 'dark' | 'light'
+  /** Parking spend the user is happy with per day, in home currency. */
+  parkingBudgetDaily: number
+  /** Road-trip mode: parking scouting and road-rule alerts. */
+  driving: boolean
+  vehicleHeightM: number
+  auddToken: string
   homeCurrency: string
   homeCountry: string
   units: 'metric' | 'imperial'
   haptics: boolean
-  scoutRadius: 500 | 1000
+  scoutRadius: 500 | 1000 | 5000
   /** Keys pasted in-app override build-time env keys. Stored on this device only. */
   googleMapsKey: string
   openWeatherKey: string
@@ -21,6 +31,17 @@ const guessCurrency = () => {
   } catch {
     return 'USD'
   }
+}
+const guessUiLang = (): UiLang => {
+  try {
+    for (const l of navigator.languages ?? [navigator.language]) {
+      const base = l.slice(0, 2).toLowerCase()
+      if (base === 'de' || base === 'tr' || base === 'ru' || base === 'en') return base
+    }
+  } catch {
+    /* default below */
+  }
+  return 'en'
 }
 const guessCountry = () => {
   try {
@@ -39,6 +60,12 @@ const REGION_CURRENCY: Record<string, string> = {
 
 export const settings = createStore<Settings>(
   {
+    uiLang: guessUiLang(),
+    theme: 'system',
+    parkingBudgetDaily: 25,
+    driving: false,
+    vehicleHeightM: 1.6,
+    auddToken: '',
     homeCurrency: guessCurrency(),
     homeCountry: guessCountry(),
     units: 'metric',
@@ -47,7 +74,7 @@ export const settings = createStore<Settings>(
     googleMapsKey: '',
     openWeatherKey: '',
     translateEndpoint: '',
-    speechLang: 'en',
+    speechLang: guessUiLang(),
     targetLang: 'th',
   },
   'backpack:settings',
@@ -58,4 +85,6 @@ export const keys = {
   openWeather: () => settings.get().openWeatherKey || import.meta.env.VITE_OPENWEATHER_KEY || '',
   oxr: () => import.meta.env.VITE_OXR_APP_ID || '',
   translateEndpoint: () => settings.get().translateEndpoint || import.meta.env.VITE_TRANSLATE_ENDPOINT || '',
+  audd: () => settings.get().auddToken || import.meta.env.VITE_AUDD_TOKEN || '',
+  parking: () => import.meta.env.VITE_PARKING_ENDPOINT || '',
 }

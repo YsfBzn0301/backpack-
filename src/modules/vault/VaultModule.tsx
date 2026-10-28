@@ -1,14 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Segmented } from '@/components/ui/Segmented'
 import { DocumentVault } from './DocumentVault'
 import { ExpenseTracker } from './ExpenseTracker'
-import { PackingList } from './PackingList'
-import { SettingsPanel } from './SettingsPanel'
 
-type Section = 'docs' | 'expenses' | 'packing' | 'settings'
+type Section = 'docs' | 'expenses'
 
 export function VaultModule() {
+  const { t } = useTranslation()
   const [section, setSection] = useState<Section>('docs')
   return (
     <div className="space-y-4">
@@ -17,18 +17,13 @@ export function VaultModule() {
         value={section}
         onChange={setSection}
         options={[
-          { value: 'docs', label: 'Docs' },
-          { value: 'expenses', label: 'Expenses' },
-          { value: 'packing', label: 'Packing' },
-          { value: 'settings', label: 'Settings' },
+          { value: 'docs', label: t('vault.docs') },
+          { value: 'expenses', label: t('vault.expenses') },
         ]}
       />
       <AnimatePresence mode="wait">
         <motion.div key={section} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }}>
-          {section === 'docs' && <DocumentVault />}
-          {section === 'expenses' && <ExpenseTracker />}
-          {section === 'packing' && <PackingList />}
-          {section === 'settings' && <SettingsPanel />}
+          {section === 'docs' ? <DocumentVault /> : <ExpenseTracker />}
         </motion.div>
       </AnimatePresence>
     </div>

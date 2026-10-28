@@ -1,4 +1,4 @@
-import { Banknote, Bed, Building2, Bus, Coffee, Cross, Flag, Pill, ShieldAlert, ShoppingBasket, Soup, UtensilsCrossed, Wine } from 'lucide-react'
+import { Banknote, Bed, Building2, Bus, Coffee, Cross, Flag, Fuel, Pill, ShieldAlert, ShoppingBasket, Soup, SquareParking, UtensilsCrossed, Wine } from 'lucide-react'
 import type { PlaceKind } from '@/agents/protocol'
 
 export const KIND_STYLE: Record<PlaceKind, { color: string; Icon: typeof Coffee }> = {
@@ -14,6 +14,8 @@ export const KIND_STYLE: Record<PlaceKind, { color: string; Icon: typeof Coffee 
   bus: { color: '#8fa8ff', Icon: Bus },
   embassy: { color: '#e6edf3', Icon: Flag },
   police: { color: '#6cb6ff', Icon: ShieldAlert },
+  fuel: { color: '#f2c14e', Icon: Fuel },
+  parking: { color: '#4f8cff', Icon: SquareParking },
 }
 
 export const FallbackIcon = Building2

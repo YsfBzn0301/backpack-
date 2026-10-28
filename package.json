@@ -8,21 +8,26 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@react-google-maps/api": "^2.20.8",
+    "@react-three/fiber": "^9.8.2",
     "@tanstack/query-async-storage-persister": "^5.105.0",
     "@tanstack/react-query": "^5.105.0",
     "@tanstack/react-query-persist-client": "^5.105.0",
     "framer-motion": "^12.43.0",
+    "i18next": "^25.10.10",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.63.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "tesseract.js": "^6.0.1"
+    "react-i18next": "^15.7.4",
+    "tesseract.js": "^6.0.1",
+    "three": "^0.178.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
@@ -30,11 +35,13 @@
     "@types/node": "^22.20.5",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.178.1",
     "@vitejs/plugin-react": "^5.0.0",
     "tailwindcss": "^4.1.0",
     "typescript": "~5.8.0",
     "vite": "^7.1.0",
     "vite-plugin-pwa": "^1.0.0",
+    "vitest": "^3.2.7",
     "workbox-window": "^7.4.1"
   }
 }

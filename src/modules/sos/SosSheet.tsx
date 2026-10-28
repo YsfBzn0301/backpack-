@@ -6,26 +6,19 @@ import type { Medical, SafetyState } from '@/agents/safety.worker'
 import type { Place } from '@/agents/protocol'
 import { FALLBACK_COUNTRY, flag, getCountry } from '@/data/countries'
 import { getPhrase } from '@/data/phrasebook'
-import { LANG_BY_CODE, langName } from '@/data/languages'
+import { LANG_BY_CODE } from '@/data/languages'
+import { countryName, fmtDistance, langName, relativeTime } from '@/i18n/format'
+import { useTranslation } from 'react-i18next'
 import { activeCoords, location } from '@/lib/location'
 import { settings } from '@/lib/settings'
 import { ui } from '@/lib/ui'
-import { directionsUrl, formatDistance } from '@/lib/geo'
-import { relativeTime } from '@/lib/format'
+import { directionsUrl } from '@/lib/geo'
 import { haptic } from '@/lib/haptics'
 import { speak } from '@/hooks/useSpeech'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 
-const SOURCE_TEXT: Record<SafetyState['countrySource'], string> = {
-  gps: 'Detected from GPS',
-  search: 'From searched destination',
-  cache: 'Last known location (offline)',
-  timezone: 'Guessed from device time zone',
-  hint: 'From weather data',
-  none: 'Location unknown',
-}
-
 export function SosSheet() {
+  const { t } = useTranslation()
   const open = ui.use((s) => s.sosOpen)
   const close = () => ui.set({ sosOpen: false })
   const safety = useAgentState<SafetyState>('safety')
@@ -46,9 +39,9 @@ export function SosSheet() {
     const c = loc.gps ?? coords
     if (!c) return
     const url = `https://maps.google.com/?q=${c.lat.toFixed(6)},${c.lng.toFixed(6)}`
-    const text = `I need help. My location: ${url}`
+    const text = t('sos.shareText', { url })
     haptic('select')
-    if (navigator.share) await navigator.share({ title: 'My location', text, url }).catch(() => {})
+    if (navigator.share) await navigator.share({ title: t('sos.myLocation'), text, url }).catch(() => {})
     else await navigator.clipboard?.writeText(text)
   }
 
@@ -63,11 +56,12 @@ export function SosSheet() {
     }
   }
 
-  const homeName = getCountry(home)?.name ?? 'your country'
+  const homeName = getCountry(home) ? countryName(home) : t('sos.yourCountry')
+  const here = countryName(country.code, country.name)
   const lines = [
-    { label: 'Police', n: country.police, Icon: ShieldAlert },
-    { label: 'Ambulance', n: country.ambulance, Icon: Ambulance },
-    { label: 'Fire', n: country.fire, Icon: Flame },
+    { label: t('sos.police'), n: country.police, Icon: ShieldAlert },
+    { label: t('sos.ambulance'), n: country.ambulance, Icon: Ambulance },
+    { label: t('sos.fire'), n: country.fire, Icon: Flame },
   ]
   const phraseLang = getPhrase(country.lang, 'doctor') ? country.lang : null
 
@@ -83,9 +77,11 @@ export function SosSheet() {
           </span>
           <div>
             <h2 className="text-lg leading-tight font-semibold">
-              {country.code !== 'XX' && flag(country.code)} {country.name}
+              {country.code !== 'XX' && flag(country.code)} {here}
             </h2>
-            <p className="text-xs text-fog-500">{SOURCE_TEXT[safety?.countrySource ?? 'none']} · works offline</p>
+            <p className="text-xs text-fog-500">
+              {t(`sos.source.${safety?.countrySource ?? 'none'}`)} · {t('sos.worksOffline')}
+            </p>
           </div>
         </div>
       }
@@ -102,23 +98,23 @@ export function SosSheet() {
       {(country.general || country.tourist) && (
         <div className="mt-2 grid grid-cols-2 gap-2">
           {country.general && (
-            <button onClick={() => call(country.general!)} className="flex items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3">
-              <span className="text-xs text-fog-400">All emergencies</span>
+            <button onClick={() => call(country.general!)} className="flex items-center justify-between rounded-2xl bg-veil/[0.04] px-4 py-3">
+              <span className="text-xs text-fog-400">{t('sos.all')}</span>
               <span className="tabular text-lg font-semibold">{country.general}</span>
             </button>
           )}
           {country.tourist && (
-            <button onClick={() => call(country.tourist!)} className="flex items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3">
-              <span className="text-xs text-fog-400">Tourist police</span>
+            <button onClick={() => call(country.tourist!)} className="flex items-center justify-between rounded-2xl bg-veil/[0.04] px-4 py-3">
+              <span className="text-xs text-fog-400">{t('sos.tourist')}</span>
               <span className="tabular text-lg font-semibold">{country.tourist}</span>
             </button>
           )}
         </div>
       )}
-      {country.note && <p className="mt-2 text-xs leading-relaxed text-fog-500">{country.note}</p>}
+      {country.note && <p className="mt-2 text-xs leading-relaxed text-fog-500">{t(`sos.note.${country.note}`)}</p>}
 
       <button onClick={share} disabled={!coords} className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-fog-100 py-3 text-sm font-semibold text-ink-900 disabled:opacity-40">
-        <Share2 size={16} /> Share my location
+        <Share2 size={16} /> {t('sos.share')}
       </button>
 
       <section className="mt-5">
@@ -133,11 +129,11 @@ export function SosSheet() {
               className="flex items-center gap-1 text-[11px] text-fog-500"
             >
               <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />
-              {safety?.medicalAt ? relativeTime(safety.medicalAt) : 'Refresh'}
+              {safety?.medicalAt ? relativeTime(safety.medicalAt) : t('common.refresh')}
             </button>
           }
         >
-          Nearest medical help
+          {t('sos.medical')}
         </SectionTitle>
         {safety?.medical.length ? (
           <ul className="space-y-1.5">
@@ -146,21 +142,21 @@ export function SosSheet() {
             ))}
           </ul>
         ) : (
-          <p className="rounded-2xl bg-white/[0.03] p-3 text-xs text-fog-500">
-            {coords ? 'SafetyAgent is looking for hospitals and pharmacies within 3 km. Needs a connection the first time.' : 'Share your location so SafetyAgent can find hospitals and pharmacies.'}
+          <p className="rounded-2xl bg-veil/[0.03] p-3 text-xs text-fog-500">
+            {coords ? t('sos.medicalSearching') : t('sos.medicalNeedLocation')}
           </p>
         )}
       </section>
 
       {phraseLang && (
         <section className="mt-5">
-          <SectionTitle>Say it in {langName(phraseLang)}</SectionTitle>
+          <SectionTitle>{t('sos.sayIt', { lang: langName(phraseLang) })}</SectionTitle>
           <ul className="space-y-1.5">
             {['ambulance', 'doctor', 'hospital', 'allergy', 'pharmacy'].map((id) => {
               const p = getPhrase(phraseLang, id)!
               return (
                 <li key={id}>
-                  <button onClick={() => speak(p.text, LANG_BY_CODE[phraseLang]?.speech ?? phraseLang)} className="flex w-full items-center gap-3 rounded-2xl bg-white/[0.03] px-3 py-2.5 text-left">
+                  <button onClick={() => speak(p.text, LANG_BY_CODE[phraseLang]?.speech ?? phraseLang)} className="flex w-full items-center gap-3 rounded-2xl bg-veil/[0.03] px-3 py-2.5 text-left">
                     <span className="min-w-0 flex-1">
                       <span className="block text-base text-fog-50" lang={phraseLang}>
                         {p.text}
@@ -177,30 +173,30 @@ export function SosSheet() {
       )}
 
       <section className="mt-5 mb-2">
-        <SectionTitle>Embassy of {homeName}</SectionTitle>
+        <SectionTitle>{t('sos.embassy', { country: homeName })}</SectionTitle>
         {embassies === null ? (
-          <button onClick={findEmbassy} disabled={!coords || loadingEmb} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/[0.04] py-3 text-sm disabled:opacity-40">
-            {loadingEmb ? <Loader2 size={15} className="animate-spin" /> : <Building2 size={15} />} Find nearby embassies
+          <button onClick={findEmbassy} disabled={!coords || loadingEmb} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-veil/[0.04] py-3 text-sm disabled:opacity-40">
+            {loadingEmb ? <Loader2 size={15} className="animate-spin" /> : <Building2 size={15} />} {t('sos.findEmbassy')}
           </button>
         ) : (
           <ul className="space-y-1.5">
             {embassies.slice(0, 5).map((e) => (
               <li key={e.id}>
-                <a href={directionsUrl(e, 'transit', e.source === 'google' ? e.id : undefined)} target="_blank" rel="noopener" className="flex items-center gap-3 rounded-2xl bg-white/[0.03] px-3 py-2.5">
+                <a href={directionsUrl(e, 'transit', e.source === 'google' ? e.id : undefined)} target="_blank" rel="noopener" className="flex items-center gap-3 rounded-2xl bg-veil/[0.03] px-3 py-2.5">
                   <Building2 size={16} className={e.match ? 'text-ember-400' : 'text-fog-500'} />
                   <span className="min-w-0 flex-1 truncate text-sm">{e.name}</span>
-                  <span className="text-xs text-fog-500">{formatDistance(e.distance)}</span>
+                  <span className="text-xs text-fog-500">{fmtDistance(e.distance)}</span>
                 </a>
               </li>
             ))}
             <li>
               <a
-                href={`https://www.google.com/search?q=${encodeURIComponent(`embassy of ${homeName} in ${country.name}`)}`}
+                href={`https://www.google.com/search?q=${encodeURIComponent(t('sos.embassyQuery', { home: homeName, here }))}`}
                 target="_blank"
                 rel="noopener"
                 className="block px-3 py-2 text-xs text-ember-400"
               >
-                Search for the official embassy contact page →
+                {t('sos.searchEmbassy')}
               </a>
             </li>
           </ul>
@@ -211,25 +207,25 @@ export function SosSheet() {
 }
 
 function MedicalRow({ m }: { m: Medical }) {
-  const units = settings.use((s) => s.units)
+  const { t } = useTranslation()
   return (
-    <li className="flex items-center gap-3 rounded-2xl bg-white/[0.03] px-3 py-2.5">
-      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-xs font-bold ${m.kind === 'hospital' ? 'bg-alert-500/15 text-alert-500' : 'bg-teal-400/15 text-teal-300'}`}>
+    <li className="flex items-center gap-3 rounded-2xl bg-veil/[0.03] px-3 py-2.5">
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-xs font-bold ${m.kind === 'hospital' ? 'bg-alert-500/15 text-alert-500' : 'bg-teal-400/15 text-teal-500'}`}>
         {m.kind === 'hospital' ? 'H' : 'Rx'}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm text-fog-100">{m.name}</span>
         <span className="block text-[11px] text-fog-500">
-          {formatDistance(m.distance, units)}
-          {m.openNow ? ' · open now' : ''}
+          {fmtDistance(m.distance)}
+          {m.openNow ? ` · ${t('map.openNow')}` : ''}
         </span>
       </span>
       {m.phone && (
-        <a href={`tel:${m.phone}`} className="grid h-8 w-8 place-items-center rounded-full bg-white/5" aria-label={`Call ${m.name}`}>
+        <a href={`tel:${m.phone}`} className="grid h-8 w-8 place-items-center rounded-full bg-veil/5" aria-label={t('sos.call', { name: m.name })}>
           <Phone size={14} />
         </a>
       )}
-      <a href={directionsUrl(m, 'driving', m.source === 'google' ? m.id : undefined)} target="_blank" rel="noopener" className="grid h-8 w-8 place-items-center rounded-full bg-white/5" aria-label={`Directions to ${m.name}`}>
+      <a href={directionsUrl(m, 'driving', m.source === 'google' ? m.id : undefined)} target="_blank" rel="noopener" className="grid h-8 w-8 place-items-center rounded-full bg-veil/5" aria-label={t('sos.directionsTo', { name: m.name })}>
         <Navigation size={14} />
       </a>
     </li>

@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Volume2, X } from 'lucide-react'
 import { speak } from '@/hooks/useSpeech'
+import { useTranslation } from 'react-i18next'
 import { LANG_BY_CODE } from '@/data/languages'
 
 /** Full-screen, high-contrast card to hand the phone to someone. */
 export function ShowToLocal({ text, phonetic, lang, onClose }: { text: string | null; phonetic?: string; lang: string; onClose: () => void }) {
+  const { t } = useTranslation()
   const l = LANG_BY_CODE[lang]
   return (
     <AnimatePresence>
@@ -19,7 +21,7 @@ export function ShowToLocal({ text, phonetic, lang, onClose }: { text: string | 
           onClick={onClose}
         >
           <div className="safe-top flex justify-end p-4">
-            <button className="grid h-10 w-10 place-items-center rounded-full bg-ink-900/10" aria-label="Close">
+            <button className="grid h-10 w-10 place-items-center rounded-full bg-ink-900/10" aria-label={t('common.close')}>
               <X size={20} />
             </button>
           </div>
@@ -37,7 +39,7 @@ export function ShowToLocal({ text, phonetic, lang, onClose }: { text: string | 
               }}
               className="flex items-center gap-2 rounded-full bg-ink-900 px-6 py-3.5 text-base font-medium text-fog-50"
             >
-              <Volume2 size={20} /> Play aloud
+              <Volume2 size={20} /> {t('translate.playAloud')}
             </button>
           </div>
         </motion.div>

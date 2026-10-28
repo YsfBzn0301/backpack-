@@ -20,6 +20,8 @@ export interface Weather {
   windKph: number
   kind: WeatherKind
   description: string
+  /** WMO code (Open-Meteo); the UI translates it. OpenWeather descriptions come pre-localised. */
+  wmoCode?: number
   isDay: boolean
   utcOffsetSec: number
   city?: string
@@ -48,11 +50,11 @@ async function getJson<T>(url: string): Promise<T> {
   return res.json()
 }
 
-export async function fetchWeather(lat: number, lng: number): Promise<Weather> {
+export async function fetchWeather(lat: number, lng: number, lang = 'en'): Promise<Weather> {
   const key = keys.openWeather()
   if (key) {
     try {
-      return await openWeather(lat, lng, key)
+      return await openWeather(lat, lng, key, lang)
     } catch {
       /* fall through to Open-Meteo */
     }
@@ -60,9 +62,9 @@ export async function fetchWeather(lat: number, lng: number): Promise<Weather> {
   return openMeteo(lat, lng)
 }
 
-async function openWeather(lat: number, lng: number, key: string): Promise<Weather> {
+async function openWeather(lat: number, lng: number, key: string, lang: string): Promise<Weather> {
   const base = 'https://api.openweathermap.org/data/2.5'
-  const q = `lat=${lat}&lon=${lng}&units=metric&appid=${key}`
+  const q = `lat=${lat}&lon=${lng}&units=metric&lang=${lang}&appid=${key}`
   type Cur = { weather: { id: number; description: string; icon: string }[]; main: { temp: number; feels_like: number; humidity: number }; wind: { speed: number }; timezone: number; name: string; sys: { country: string; sunrise: number; sunset: number }; dt: number }
   type Fc = { list: { dt: number; main: { temp_min: number; temp_max: number }; weather: { id: number }[]; pop: number }[]; city: { timezone: number } }
   const [cur, fc] = await Promise.all([getJson<Cur>(`${base}/weather?${q}`), getJson<Fc>(`${base}/forecast?${q}`)])
@@ -120,6 +122,7 @@ async function openMeteo(lat: number, lng: number): Promise<Weather> {
     windKph: r.current.wind_speed_10m,
     kind: wmoKind(r.current.weather_code),
     description: WMO_TEXT[r.current.weather_code] ?? '',
+    wmoCode: r.current.weather_code,
     isDay: r.current.is_day === 1,
     utcOffsetSec: r.utc_offset_seconds,
     daily: r.daily.time.map((date, i) => ({

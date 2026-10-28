@@ -5,8 +5,12 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { createStore, del, get, set } from 'idb-keyval'
 import { MotionConfig } from 'framer-motion'
+import { initI18n } from './i18n'
+import { applyInitialTheme } from './lib/theme'
 import App from './App'
 import './index.css'
+
+applyInitialTheme()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,12 +29,14 @@ const persister = createAsyncStoragePersister({
   throttleTime: 2000,
 })
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: 3 * 24 * 3600_000, buster: 'v1' }}>
-      <MotionConfig reducedMotion="user">
-        <App />
-      </MotionConfig>
-    </PersistQueryClientProvider>
-  </StrictMode>,
+initI18n().then(() =>
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: 3 * 24 * 3600_000, buster: 'v1' }}>
+        <MotionConfig reducedMotion="user">
+          <App />
+        </MotionConfig>
+      </PersistQueryClientProvider>
+    </StrictMode>,
+  ),
 )

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -7,7 +8,10 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   worker: { format: 'es' },
+  test: { include: ['src/**/*.test.ts'], environment: 'node' },
   build: {
+    // Three.js (Audio Scout) is lazy-loaded and legitimately large.
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -27,7 +31,7 @@ export default defineConfig({
       manifest: {
         name: 'Backpack — Travel Companion',
         short_name: 'Backpack',
-        description: 'Offline-first travel companion: weather, maps, currency, translation, SOS and a private document vault.',
+        description: 'Offline-first travel, road-trip and parking companion: weather, maps, parking, transit, currency, translation, music, SOS and a private vault.',
         theme_color: '#0d1117',
         background_color: '#0d1117',
         display: 'standalone',
@@ -43,7 +47,9 @@ export default defineConfig({
         ],
         shortcuts: [
           { name: 'Emergency SOS', url: '/?sos=1', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
-          { name: 'Translate', url: '/?tab=translate', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Find parking', url: '/?tab=map&mode=parking', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Departures', url: '/?tab=transit', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Camera', url: '/?action=camera', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
         ],
       },
       workbox: {
@@ -65,6 +71,11 @@ export default defineConfig({
             urlPattern: ({ url }) => /maps\.googleapis\.com|maps\.gstatic\.com/.test(url.hostname),
             handler: 'StaleWhileRevalidate',
             options: { cacheName: 'google-maps', expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 } },
+          },
+          {
+            urlPattern: ({ url }) => /mzstatic\.com|scdn\.co/.test(url.hostname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'album-art', expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 }, cacheableResponse: { statuses: [0, 200] } },
           },
           {
             urlPattern: ({ url }) => /cdn\.jsdelivr\.net|tessdata/.test(url.href),

@@ -7,7 +7,9 @@ import { get, set, createStore } from 'idb-keyval'
 import { defineAgent, fetchJson, type AgentApi } from './runtime'
 import { SEED_RATES } from '@/data/currencies'
 import { getCountry } from '@/data/countries'
-import { BENCH_KEYWORDS, BENCH_LABELS, benchmarkFor, type BenchItem } from '@/data/benchmarks'
+import { BENCH_KEYWORDS, benchmarkFor, type BenchItem } from '@/data/benchmarks'
+import { msg, type Msg } from './protocol'
+import type { ParkingEstimate, RateSummary } from '@/lib/parking-cost'
 
 export interface RatesSnapshot {
   base: 'USD'
@@ -28,12 +30,22 @@ export type ExpenseCategory = 'food' | 'transport' | 'stay' | 'activities' | 'sh
 
 export interface PriceCheck {
   item: BenchItem | null
-  itemLabel?: string
   verdict: 'low' | 'fair' | 'high' | 'steep' | 'unknown'
   ratio?: number
   typicalLocal?: number
   currency: string
-  message: string
+  message: Msg
+}
+
+export interface ParkingQuote {
+  id: string
+  home: string
+  totalHome: number | null
+  perHourHome?: number
+  perDayHome?: number
+  flatHome?: number
+  verdict: 'free' | 'within' | 'over' | 'unknown'
+  alerts: Msg[]
 }
 
 const db = createStore('backpack-budget', 'kv')
@@ -97,21 +109,16 @@ function benchItem(text: string): BenchItem | null {
 
 function priceCheck(fx: RatesSnapshot, p: { text: string; amount: number; currency: string; country?: string | null }): PriceCheck {
   const item = benchItem(p.text)
-  if (!item) return { item: null, verdict: 'unknown', currency: p.currency, message: 'No benchmark for this item yet.' }
+  if (!item) return { item: null, verdict: 'unknown', currency: p.currency, message: msg('money.verdictMsg.unknown') }
   const usd = convert(fx, p.amount, p.currency, 'USD')
   const typicalUsd = benchmarkFor(p.country)[item]
   const typicalLocal = convert(fx, typicalUsd, 'USD', p.currency)
   const ratio = usd / typicalUsd
-  const country = getCountry(p.country)?.name ?? 'this region'
+  const country = getCountry(p.country) ? { t: 'country' as const, code: p.country! } : msg('money.thisRegion')
   const verdict: PriceCheck['verdict'] = ratio < 0.7 ? 'low' : ratio <= 1.35 ? 'fair' : ratio <= 2 ? 'high' : 'steep'
   const pct = Math.round((ratio - 1) * 100)
-  const message =
-    verdict === 'fair'
-      ? `About normal for ${country}.`
-      : verdict === 'low'
-        ? `Cheaper than usual for ${country}. Good find.`
-        : `${pct}% above the usual ${BENCH_LABELS[item].toLowerCase()} price in ${country}.${verdict === 'steep' ? ' Worth bargaining or walking a block.' : ''}`
-  return { item, itemLabel: BENCH_LABELS[item], verdict, ratio, typicalLocal, currency: p.currency, message }
+  const message = msg(`money.verdictMsg.${verdict}`, { country, pct, item: msg(`bench.${item}`) })
+  return { item, verdict, ratio, typicalLocal, currency: p.currency, message }
 }
 
 const SYMBOLS: [RegExp, string][] = [
@@ -160,9 +167,9 @@ defineAgent<BudgetState>({
           kind: 'info',
           priority: 1,
           ttl: 12 * 3600_000,
-          title: `Local currency: ${country.currency}`,
-          body: `1 ${ctx.homeCurrency} ≈ ${one >= 100 ? Math.round(one).toLocaleString() : one.toFixed(2)} ${country.currency}. Converter switched over; rates are cached for offline use.`,
-          action: { label: 'Convert', type: 'tab', payload: 'convert' },
+          title: msg('agents.budget.localTitle', { cur: country.currency }),
+          body: msg('agents.budget.localBody', { home: { t: 'money', amount: 1, cur: ctx.homeCurrency }, local: { t: 'money', amount: one, cur: country.currency } }),
+          action: { label: msg('actions.convert'), type: 'tab', payload: 'convert' },
         })
       }
     }
@@ -171,12 +178,56 @@ defineAgent<BudgetState>({
         key: 'budget-stale',
         kind: 'alert',
         priority: 1,
-        title: 'Exchange rates are getting old',
-        body: 'You have been offline for a while. Conversions use the last saved rates.',
+        title: msg('agents.budget.staleTitle'),
+        body: msg('agents.budget.staleBody'),
       })
     } else api.retract('budget-stale')
   },
   tasks: {
+    /**
+     * Price parking estimates in home currency and check them against the
+     * daily parking budget. With notify, also raises a surcharge alert.
+     */
+    parkingQuote: (
+      p: { items: { id: string; name?: string; estimate: ParkingEstimate; rates: RateSummary }[]; stayMin: number; notify?: boolean },
+      api,
+    ): ParkingQuote[] => {
+      const ctx = api.context()
+      const home = ctx?.homeCurrency ?? 'USD'
+      const budget = ctx?.parkingBudgetDaily ?? 0
+      const fx = api.state().fx
+      const conv = (v: number | undefined, cur: string | null | undefined) => (v == null || !cur ? undefined : convert(fx, v, cur, home))
+      const out = p.items.map(({ id, name, estimate, rates }) => {
+        const totalHome = estimate.total == null ? null : estimate.total === 0 ? 0 : (conv(estimate.total, estimate.currency) ?? null)
+        // Scale the stay cost to a day so short stays compare fairly with a daily budget.
+        const dayEquivalent = totalHome == null ? null : estimate.dailyCapped || p.stayMin >= 1440 ? totalHome / Math.ceil(p.stayMin / 1440) : totalHome
+        const verdict: ParkingQuote['verdict'] = totalHome === 0 ? 'free' : dayEquivalent == null || !budget ? 'unknown' : dayEquivalent > budget ? 'over' : 'within'
+        const alerts: Msg[] = []
+        if (estimate.surcharge && rates.currency)
+          alerts.push(
+            msg('parking.alert.surcharge', {
+              when: { t: 'hours', spec: estimate.surcharge.when },
+              rate: { t: 'money', amount: conv(estimate.surcharge.perHour, rates.currency) ?? estimate.surcharge.perHour, cur: home },
+              base: { t: 'money', amount: conv(estimate.surcharge.basePerHour, rates.currency) ?? estimate.surcharge.basePerHour, cur: home },
+            }),
+          )
+        if (verdict === 'over' && totalHome != null) alerts.push(msg('parking.alert.overBudget', { amount: { t: 'money', amount: totalHome, cur: home }, budget: { t: 'money', amount: budget, cur: home } }))
+        if (p.notify && estimate.surcharge && name)
+          api.emit({ key: 'budget-parking-surcharge', kind: 'alert', priority: 2, ttl: 3 * 3600_000, title: msg('agents.budget.surchargeTitle', { name }), body: alerts[0] })
+        return {
+          id,
+          home,
+          totalHome,
+          perHourHome: conv(rates.perHour, rates.currency),
+          perDayHome: conv(rates.perDay, rates.currency),
+          flatHome: conv(rates.flat, rates.currency),
+          verdict,
+          alerts,
+        }
+      })
+      if (p.notify && !p.items.some((i) => i.estimate.surcharge)) api.retract('budget-parking-surcharge')
+      return out
+    },
     rates: (_: never, api) => api.state().fx,
     sync: (_: never, api) => sync(api, true),
     configure: (p: { oxrAppId: string }, api) => api.publish({ oxrAppId: p.oxrAppId }),

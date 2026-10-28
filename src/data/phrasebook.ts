@@ -229,6 +229,29 @@ export const PHRASEBOOK: Record<string, Book> = {
     ['ممكن تخفيض؟', 'mumkin takhfīḍ?'],
     ['أنا أتفرج فقط', 'anā atafarraj faqaṭ'],
   ]),
+  ru: book([
+    ['Здравствуйте', 'zdravstvuyte'],
+    ['Спасибо', 'spasibo'],
+    ['Извините', 'izvinite'],
+    ['Я не понимаю', 'ya ne ponimayu'],
+    ['Можно меню, пожалуйста?', 'mozhno menyu, pozhaluysta?'],
+    ['Не острое, пожалуйста', 'ne ostroye, pozhaluysta'],
+    ['Я вегетарианец / вегетарианка', 'ya vegetarianets / vegetarianka'],
+    ['Счёт, пожалуйста', 'schyot, pozhaluysta'],
+    ['Мне нужен врач', 'mne nuzhen vrach'],
+    ['Где больница?', 'gde bolnitsa?'],
+    ['Где аптека?', 'gde apteka?'],
+    ['У меня аллергия', 'u menya allergiya'],
+    ['Вызовите скорую!', 'vyzovite skoruyu!'],
+    ['Где автовокзал?', 'gde avtovokzal?'],
+    ['Отвезите меня по этому адресу, пожалуйста', 'otvezite menya po etomu adresu, pozhaluysta'],
+    ['Остановите здесь, пожалуйста', 'ostanovite zdes, pozhaluysta'],
+    ['Один билет, пожалуйста', 'odin bilet, pozhaluysta'],
+    ['Сколько это стоит?', 'skolko eto stoit?'],
+    ['Это слишком дорого', 'eto slishkom dorogo'],
+    ['Можно подешевле?', 'mozhno podeshevle?'],
+    ['Я просто смотрю', 'ya prosto smotryu'],
+  ]),
   tr: book([
     ['Merhaba'],
     ['Teşekkür ederim'],
@@ -370,6 +393,15 @@ export const PHRASEBOOK: Record<string, Book> = {
 }
 
 export const PHRASEBOOK_LANGS = Object.keys(PHRASEBOOK)
+
+/** A phrase label in the user's UI language (falls back to English). */
+export function phraseLabel(uiLang: string, id: string) {
+  if (uiLang !== 'en') {
+    const e = PHRASEBOOK[uiLang]?.[id]
+    if (e) return e[0]
+  }
+  return PHRASES.find((p) => p.id === id)?.en ?? id
+}
 
 export function getPhrase(lang: string, id: string) {
   const e = PHRASEBOOK[lang]?.[id]

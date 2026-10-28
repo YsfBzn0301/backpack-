@@ -5,6 +5,7 @@
  */
 import { get, set, createStore } from 'idb-keyval'
 import { defineAgent, fetchJson } from './runtime'
+import { msg } from './protocol'
 import { LANGUAGES } from '@/data/languages'
 import { PHRASEBOOK, PHRASES } from '@/data/phrasebook'
 import { getCountry } from '@/data/countries'
@@ -226,18 +227,16 @@ defineAgent<TranslateState>({
     if (!country || country.code === prevCountry?.code) return
     if (country.lang !== api.state().suggestedLang) {
       api.publish({ suggestedLang: country.lang === 'en' ? null : country.lang })
-      if (country.lang !== 'en') {
-        const lang = LANGUAGES.find((l) => l.code === country.lang)
+      if (country.lang !== 'en' && country.lang !== ctx.lang) {
+        const lang = { t: 'lang' as const, code: country.lang }
         api.emit({
           key: 'translate-lang',
           kind: 'info',
           priority: 0,
           ttl: 6 * 3600_000,
-          title: `Translator ready for ${lang?.name ?? country.lang}`,
-          body: PHRASEBOOK[country.lang]
-            ? `Offline phrasebook for ${lang?.name} is loaded: food, medical, transport and bargaining.`
-            : `Live translation set to ${lang?.name ?? country.lang}. Phrasebook not available offline for this language.`,
-          action: { label: 'Translate', type: 'tab', payload: 'translate' },
+          title: msg('agents.translate.readyTitle', { lang }),
+          body: msg(PHRASEBOOK[country.lang] ? 'agents.translate.readyOffline' : 'agents.translate.readyOnline', { lang }),
+          action: { label: msg('actions.translate'), type: 'screen', payload: 'translate' },
         })
       }
     }

@@ -47,7 +47,7 @@ export function useSpeechRecognition(lang: string, onFinal: (text: string) => vo
 
   const start = useCallback(() => {
     if (!SR) {
-      setError('Speech recognition is not supported in this browser. Type instead.')
+      setError('notSupported')
       return
     }
     rec.current?.abort()
@@ -67,13 +67,9 @@ export function useSpeechRecognition(lang: string, onFinal: (text: string) => vo
       setInterim(finalRef.current + interimText)
     }
     r.onerror = (e) => {
-      const map: Record<string, string> = {
-        'not-allowed': 'Microphone access was blocked. Allow it in your browser settings.',
-        'no-speech': "Didn't catch that. Try again a little closer.",
-        network: 'Speech recognition needs a connection in this browser. Type or use the phrasebook.',
-        'language-not-supported': 'This browser cannot listen in that language yet.',
-      }
-      if (e.error !== 'aborted') setError(map[e.error] ?? `Speech error: ${e.error}`)
+      // Error codes; the UI translates them (translate.err.*).
+      const map: Record<string, string> = { 'not-allowed': 'notAllowed', 'service-not-allowed': 'notAllowed', 'no-speech': 'noSpeech', network: 'network', 'language-not-supported': 'langUnsupported' }
+      if (e.error !== 'aborted') setError(map[e.error] ?? 'generic')
     }
     r.onend = () => {
       setListening(false)
@@ -87,8 +83,8 @@ export function useSpeechRecognition(lang: string, onFinal: (text: string) => vo
     try {
       r.start()
       setListening(true)
-    } catch (err) {
-      setError(String(err))
+    } catch {
+      setError('generic')
     }
   }, [lang])
 

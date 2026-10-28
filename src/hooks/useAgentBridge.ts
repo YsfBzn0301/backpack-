@@ -50,12 +50,16 @@ export function useAgentBridge() {
       placeName: loc.searched?.name ?? w?.city ?? safety?.city ?? undefined,
       countryHint: loc.searched?.countryCode ?? w?.countryCode,
       country: source === 'search' ? (loc.searched?.countryCode ?? resolved) : resolved,
-      weather: w ? { tempC: w.tempC, kind: w.kind, description: w.description, humidity: w.humidity, isDay: w.isDay } : undefined,
+      weather: w ? { tempC: w.tempC, kind: w.kind, description: w.description, wmo: w.wmoCode, humidity: w.humidity, isDay: w.isDay } : undefined,
       utcOffsetSec: w?.utcOffsetSec ?? -new Date().getTimezoneOffset() * 60,
       online,
       homeCurrency: s.homeCurrency,
       homeCountry: s.homeCountry,
       radius: s.scoutRadius,
+      lang: s.uiLang,
+      driving: s.driving,
+      vehicleHeightM: s.vehicleHeightM,
+      parkingBudgetDaily: s.parkingBudgetDaily,
       now: Date.now(),
     }
     // Skip re-broadcasting identical context (except the minute tick).
@@ -64,7 +68,7 @@ export function useAgentBridge() {
     lastSent.current = sig
     agents.setContext(ctx)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coords?.lat, coords?.lng, source, w?.fetchedAt, online, s.homeCurrency, s.homeCountry, s.scoutRadius, resolved, tick, loc.searched?.name])
+  }, [coords?.lat, coords?.lng, source, w?.fetchedAt, online, s.homeCurrency, s.homeCountry, s.scoutRadius, s.uiLang, s.driving, s.vehicleHeightM, s.parkingBudgetDaily, resolved, tick, loc.searched?.name])
 
   return { coords, source, weather, online, gpsStatus: loc.gpsStatus }
 }

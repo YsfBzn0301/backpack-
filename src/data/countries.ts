@@ -3,6 +3,8 @@
  * Emergency numbers: [police, ambulance, fire]. `general` is the universal line
  * where one exists. Verify locally on arrival: numbers change.
  */
+export type CountryNote = 'eu112' | 'greenAngels' | 'nhs111' | 'gendarmerie' | 'mobile112' | 'japanHotline' | 'touristPolice' | 'fallback112'
+
 export interface Country {
   code: string
   name: string
@@ -13,18 +15,21 @@ export interface Country {
   tourist?: string
   lang: string
   currency: string
-  note?: string
+  /** Locale key under `sos.note.*`. */
+  note?: CountryNote
 }
 
 type Row = [code: string, name: string, police: string, ambulance: string, fire: string, lang: string, currency: string, extra?: Partial<Country>]
 
-const EU112 = { general: '112', note: '112 works from any phone across the EU, including without a SIM.' }
+
+
+const EU112 = { general: '112', note: 'eu112' as const }
 
 const ROWS: Row[] = [
   ['US', 'United States', '911', '911', '911', 'en', 'USD'],
   ['CA', 'Canada', '911', '911', '911', 'en', 'CAD'],
-  ['MX', 'Mexico', '911', '911', '911', 'es', 'MXN', { tourist: '078', note: '078 is the Green Angels tourist assistance line.' }],
-  ['GB', 'United Kingdom', '999', '999', '999', 'en', 'GBP', { general: '112', note: '111 for non-emergency NHS medical advice.' }],
+  ['MX', 'Mexico', '911', '911', '911', 'es', 'MXN', { tourist: '078', note: 'greenAngels' }],
+  ['GB', 'United Kingdom', '999', '999', '999', 'en', 'GBP', { general: '112', note: 'nhs111' }],
   ['IE', 'Ireland', '112', '112', '112', 'en', 'EUR', EU112],
   ['FR', 'France', '17', '15', '18', 'fr', 'EUR', EU112],
   ['DE', 'Germany', '110', '112', '112', 'de', 'EUR', EU112],
@@ -65,9 +70,9 @@ const ROWS: Row[] = [
   ['QA', 'Qatar', '999', '999', '999', 'ar', 'QAR'],
   ['OM', 'Oman', '9999', '9999', '9999', 'ar', 'OMR'],
   ['EG', 'Egypt', '122', '123', '180', 'ar', 'EGP', { tourist: '126' }],
-  ['MA', 'Morocco', '19', '15', '15', 'ar', 'MAD', { note: '177 for the Gendarmerie outside cities.' }],
+  ['MA', 'Morocco', '19', '15', '15', 'ar', 'MAD', { note: 'gendarmerie' }],
   ['TN', 'Tunisia', '197', '190', '198', 'ar', 'TND'],
-  ['ZA', 'South Africa', '10111', '10177', '10177', 'en', 'ZAR', { general: '112', note: '112 from mobiles routes to the nearest service.' }],
+  ['ZA', 'South Africa', '10111', '10177', '10177', 'en', 'ZAR', { general: '112', note: 'mobile112' }],
   ['KE', 'Kenya', '999', '999', '999', 'sw', 'KES', { general: '112' }],
   ['TZ', 'Tanzania', '112', '112', '112', 'sw', 'TZS'],
   ['UG', 'Uganda', '999', '999', '999', 'en', 'UGX', { general: '112' }],
@@ -83,10 +88,10 @@ const ROWS: Row[] = [
   ['CN', 'China', '110', '120', '119', 'zh', 'CNY'],
   ['HK', 'Hong Kong', '999', '999', '999', 'zh', 'HKD', { general: '112' }],
   ['TW', 'Taiwan', '110', '119', '119', 'zh', 'TWD'],
-  ['JP', 'Japan', '110', '119', '119', 'ja', 'JPY', { note: 'Japan Visitor Hotline (24h, English): 050-3816-2787.' }],
+  ['JP', 'Japan', '110', '119', '119', 'ja', 'JPY', { note: 'japanHotline' }],
   ['KR', 'South Korea', '112', '119', '119', 'ko', 'KRW', { tourist: '1330' }],
   ['MN', 'Mongolia', '102', '103', '101', 'mn', 'MNT'],
-  ['TH', 'Thailand', '191', '1669', '199', 'th', 'THB', { tourist: '1155', note: 'Tourist Police (1155) speak English and handle scams and theft.' }],
+  ['TH', 'Thailand', '191', '1669', '199', 'th', 'THB', { tourist: '1155', note: 'touristPolice' }],
   ['VN', 'Vietnam', '113', '115', '114', 'vi', 'VND'],
   ['LA', 'Laos', '1191', '1195', '1190', 'lo', 'LAK'],
   ['KH', 'Cambodia', '117', '119', '118', 'km', 'KHR'],
@@ -95,7 +100,7 @@ const ROWS: Row[] = [
   ['SG', 'Singapore', '999', '995', '995', 'en', 'SGD'],
   ['ID', 'Indonesia', '110', '118', '113', 'id', 'IDR', { general: '112' }],
   ['PH', 'Philippines', '911', '911', '911', 'tl', 'PHP'],
-  ['AU', 'Australia', '000', '000', '000', 'en', 'AUD', { general: '112', note: '112 works from mobiles even without credit.' }],
+  ['AU', 'Australia', '000', '000', '000', 'en', 'AUD', { general: '112', note: 'mobile112' }],
   ['NZ', 'New Zealand', '111', '111', '111', 'en', 'NZD'],
   ['FJ', 'Fiji', '917', '911', '910', 'en', 'FJD'],
   ['BR', 'Brazil', '190', '192', '193', 'pt', 'BRL'],
@@ -130,7 +135,7 @@ export const FALLBACK_COUNTRY: Country = {
   general: '112',
   lang: 'en',
   currency: 'USD',
-  note: '112 is the most widely supported mobile emergency number worldwide. 911 also redirects on many networks.',
+  note: 'fallback112',
 }
 
 export const getCountry = (code?: string | null) => (code && COUNTRIES[code.toUpperCase()]) || null

@@ -1,9 +1,11 @@
 import { Delete } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Pressable } from '@/components/ui/Pressable'
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'] as const
 
 export function Numpad({ onKey, onClear }: { onKey: (k: string) => void; onClear: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="grid grid-cols-3 gap-2" data-no-swipe>
       {KEYS.map((k) => (
@@ -19,7 +21,7 @@ export function Numpad({ onKey, onClear }: { onKey: (k: string) => void; onClear
             }
           }}
           className="tabular h-14 rounded-2xl bg-ink-800 text-2xl font-light text-fog-50 hairline border active:bg-ink-700"
-          aria-label={k === 'del' ? 'Delete' : k}
+          aria-label={k === 'del' ? t('money.delete') : k}
         >
           {k === 'del' ? <Delete size={22} className="mx-auto text-fog-300" /> : k}
         </Pressable>

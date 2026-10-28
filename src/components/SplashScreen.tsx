@@ -1,15 +1,17 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Emblem } from './Emblem'
+import { useTranslation } from 'react-i18next'
 import { agents } from '@/agents/host'
 
-const STEPS = ['Packing your gear', 'Waking up agents', 'Reading the sky', 'Ready']
+const STEPS = ['packing', 'agents', 'sky', 'ready'] as const
 
 /**
  * Boot screen. Stays up for the logo animation (≈1.9 s) and until the agents
  * report in, capped so a slow worker never blocks the app.
  */
 export function SplashScreen({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation()
   const [step, setStep] = useState(0)
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
           />
         </motion.div>
         <motion.p key={step} className="mt-3 font-mono text-[11px] tracking-wide text-fog-500" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
-          {STEPS[step]}
+          {t(`splash.${STEPS[step]}`)}
         </motion.p>
       </div>
     </motion.div>

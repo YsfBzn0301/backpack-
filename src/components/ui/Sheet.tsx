@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useDragControls, type PanInfo } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useEffect, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { haptic } from '@/lib/haptics'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 /** Bottom sheet with drag-to-dismiss from the handle. */
 export function Sheet({ open, onClose, title, children, tone = 'default', height = 0.88 }: Props) {
+  const { t } = useTranslation()
   const controls = useDragControls()
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export function Sheet({ open, onClose, title, children, tone = 'default', height
             <div className="flex cursor-grab touch-none items-center justify-between px-5 pt-3 pb-2" onPointerDown={(e) => controls.start(e)}>
               <div className="w-8" />
               <div className="h-1.5 w-10 rounded-full bg-fog-500/40" />
-              <button aria-label="Close" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-fog-400 hover:bg-white/5">
+              <button aria-label={t('common.close')} onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-fog-400 hover:bg-veil/5">
                 <X size={18} />
               </button>
             </div>

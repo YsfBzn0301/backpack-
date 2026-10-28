@@ -9,7 +9,9 @@ import { CURRENCY_BY_CODE } from '@/data/currencies'
 import { flag } from '@/data/countries'
 import { createStore } from '@/lib/store'
 import { settings } from '@/lib/settings'
-import { formatMoney, formatNumber, relativeTime } from '@/lib/format'
+import { fmtMoney as formatMoney, fmtNumber as formatNumber, relativeTime } from '@/i18n/format'
+import { useMsg } from '@/i18n/msg'
+import { useTranslation } from 'react-i18next'
 import { haptic } from '@/lib/haptics'
 import { Pressable } from '@/components/ui/Pressable'
 import { SectionTitle } from '@/components/ui/SectionTitle'
@@ -21,6 +23,8 @@ const pair = createStore({ from: '', to: '', userPicked: false }, 'backpack:fx-p
 const TIPS = [0, 10, 15, 20]
 
 export function ConvertModule() {
+  const { t } = useTranslation()
+  const render = useMsg()
   const { fx, convert, syncing, refresh, localCurrency, error } = useExchangeRates()
   const home = settings.use((s) => s.homeCurrency)
   const p = pair.use()
@@ -92,44 +96,42 @@ export function ConvertModule() {
   return (
     <div className="space-y-4">
       <section className="card p-4">
-        <CurrencyRow code={from} onPick={() => setPicking('from')} value={formatNumber(amount, 2)} big label="You pay" />
+        <CurrencyRow code={from} onPick={() => setPicking('from')} value={formatNumber(amount, 2)} big label={t('money.youPay')} />
         <div className="relative my-1 flex items-center">
-          <div className="h-px flex-1 bg-white/5" />
-          <Pressable onClick={swap} className="mx-2 grid h-9 w-9 place-items-center rounded-full bg-ink-700 text-fog-100" aria-label="Swap currencies">
+          <div className="h-px flex-1 bg-veil/5" />
+          <Pressable onClick={swap} className="mx-2 grid h-9 w-9 place-items-center rounded-full bg-ink-700 text-fog-100" aria-label={t('money.swap')}>
             <ArrowDownUp size={16} />
           </Pressable>
-          <div className="h-px flex-1 bg-white/5" />
+          <div className="h-px flex-1 bg-veil/5" />
         </div>
-        <CurrencyRow code={to} onPick={() => setPicking('to')} value={Number.isFinite(converted) ? formatNumber(converted, converted > 1000 ? 0 : 2) : '—'} label={people > 1 ? `Each of ${people}` : 'You get'} accent />
+        <CurrencyRow code={to} onPick={() => setPicking('to')} value={Number.isFinite(converted) ? formatNumber(converted, converted > 1000 ? 0 : 2) : '—'} label={people > 1 ? t('money.each', { n: people }) : t('money.youGet')} accent />
         <div className="mt-3 flex items-center justify-between text-[11px] text-fog-500">
-          <span>
-            1 {from} = {formatNumber(convert(1, from, to), 4)} {to}
-          </span>
+          <span>{t('money.rate', { from, to, rate: formatNumber(convert(1, from, to), 4) })}</span>
           <button onClick={() => refresh()} className="flex items-center gap-1 hover:text-fog-300">
             <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
-            {fx.source === 'seed' ? 'Approximate offline rates' : `${fresh ? 'Live' : 'Cached'} · ${relativeTime(fx.fetchedAt)}`}
+            {fx.source === 'seed' ? t('money.approx') : `${fresh ? t('common.live') : t('common.cached')} · ${relativeTime(fx.fetchedAt)}`}
           </button>
         </div>
-        {error && fx.source === 'seed' && <p className="mt-1 text-[11px] text-amber-glow">Could not reach the rate provider. Using built-in approximate rates.</p>}
+        {error && fx.source === 'seed' && <p className="mt-1 text-[11px] text-amber-glow">{t('money.providerError')}</p>}
       </section>
 
       <div className="no-scrollbar flex items-center gap-2 overflow-x-auto" data-no-swipe>
-        {TIPS.map((t) => (
-          <Chip key={t} active={tip === t} onClick={() => setTip(t)}>
-            {t === 0 ? 'No tip' : `+${t}%`}
+        {TIPS.map((tp) => (
+          <Chip key={tp} active={tip === tp} onClick={() => setTip(tp)}>
+            {tp === 0 ? t('money.noTip') : `+${tp}%`}
           </Chip>
         ))}
         <Chip active={tax} onClick={() => setTax((v) => !v)}>
-          +7% tax
+          {t('money.tax')}
         </Chip>
         <div className="ml-auto flex shrink-0 items-center gap-1 rounded-full bg-ink-800 p-1 hairline border">
-          <button onClick={() => setPeople((n) => Math.max(1, n - 1))} className="grid h-7 w-7 place-items-center rounded-full text-fog-300 hover:bg-white/5" aria-label="Fewer people">
+          <button onClick={() => setPeople((n) => Math.max(1, n - 1))} className="grid h-7 w-7 place-items-center rounded-full text-fog-300 hover:bg-veil/5" aria-label={t('money.fewer')}>
             <Minus size={14} />
           </button>
           <span className="tabular flex items-center gap-1 px-1 text-xs text-fog-100">
             <Users size={12} /> {people}
           </span>
-          <button onClick={() => setPeople((n) => Math.min(20, n + 1))} className="grid h-7 w-7 place-items-center rounded-full text-fog-300 hover:bg-white/5" aria-label="More people">
+          <button onClick={() => setPeople((n) => Math.min(20, n + 1))} className="grid h-7 w-7 place-items-center rounded-full text-fog-300 hover:bg-veil/5" aria-label={t('money.more')}>
             <Plus size={14} />
           </button>
         </div>
@@ -138,8 +140,8 @@ export function ConvertModule() {
       <AnimatePresence>
         {(tip > 0 || tax || people > 1) && (
           <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="px-1 text-xs text-fog-400">
-            Total {formatMoney(gross, from)} ({formatMoney(convert(gross, from, to), to)})
-            {people > 1 && ` · split ${people} ways`}
+            {t('money.total', { local: formatMoney(gross, from), home: formatMoney(convert(gross, from, to), to) })}
+            {people > 1 && ` · ${t('money.split', { n: people })}`}
           </motion.p>
         )}
       </AnimatePresence>
@@ -147,7 +149,7 @@ export function ConvertModule() {
       <Numpad onKey={onKey} onClear={() => setRaw('0')} />
 
       <section className="card p-4">
-        <SectionTitle>Is this a fair price?</SectionTitle>
+        <SectionTitle>{t('money.fairTitle')}</SectionTitle>
         <div className="flex gap-2">
           <input
             value={item}
@@ -156,29 +158,27 @@ export function ConvertModule() {
               setCheck(null)
             }}
             onKeyDown={(e) => e.key === 'Enter' && runCheck()}
-            placeholder={`What costs ${formatMoney(amount, from)}? e.g. "coffee", "taxi 3 km"`}
+            placeholder={t('money.fairPlaceholder', { amount: formatMoney(amount, from) })}
             className="min-w-0 flex-1 rounded-xl bg-ink-900 px-3 py-2.5 text-sm outline-none hairline border placeholder:text-fog-500 focus:border-ember-500/40"
           />
           <button onClick={runCheck} className="shrink-0 rounded-xl bg-fog-100 px-4 text-sm font-medium text-ink-900 disabled:opacity-40" disabled={!item.trim()}>
-            Check
+            {t('money.check')}
           </button>
         </div>
         <AnimatePresence>
           {check && (
-            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-3 flex items-start gap-3 rounded-xl bg-white/[0.03] p-3">
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-3 flex items-start gap-3 rounded-xl bg-veil/[0.03] p-3">
               <span
                 className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
-                  check.verdict === 'steep' ? 'bg-alert-500/20 text-alert-500' : check.verdict === 'high' ? 'bg-amber-glow/20 text-amber-glow' : check.verdict === 'unknown' ? 'bg-white/10 text-fog-400' : 'bg-moss-400/15 text-moss-400'
+                  check.verdict === 'steep' ? 'bg-alert-500/20 text-alert-500' : check.verdict === 'high' ? 'bg-amber-glow/20 text-amber-glow' : check.verdict === 'unknown' ? 'bg-veil/10 text-fog-400' : 'bg-moss-400/15 text-moss-400'
                 }`}
               >
-                {check.verdict}
+                {t(`money.verdict.${check.verdict}`)}
               </span>
               <div className="text-xs leading-relaxed text-fog-300">
-                {check.message}
-                {check.typicalLocal != null && (
-                  <span className="block text-fog-500">
-                    Typical {check.itemLabel?.toLowerCase()}: about {formatMoney(check.typicalLocal, from)}
-                  </span>
+                {render(check.message)}
+                {check.typicalLocal != null && check.item && (
+                  <span className="block text-fog-500">{t('money.typical', { item: t(`bench.${check.item}`), amount: formatMoney(check.typicalLocal, from) })}</span>
                 )}
               </div>
             </motion.div>
@@ -187,10 +187,10 @@ export function ConvertModule() {
       </section>
 
       <section>
-        <SectionTitle>Quick reference</SectionTitle>
-        <div className="card divide-y divide-white/5">
+        <SectionTitle>{t('money.reference')}</SectionTitle>
+        <div className="card divide-y divide-veil/5">
           {reference.map((v) => (
-            <button key={v} onClick={() => setRaw(String(v))} className="tabular flex w-full items-center justify-between px-4 py-2.5 text-sm hover:bg-white/[0.02]">
+            <button key={v} onClick={() => setRaw(String(v))} className="tabular flex w-full items-center justify-between px-4 py-2.5 text-sm hover:bg-veil/[0.02]">
               <span className="text-fog-300">{formatMoney(v, from)}</span>
               <span className="font-medium text-fog-50">{formatMoney(convert(v, from, to), to)}</span>
             </button>
@@ -212,7 +212,7 @@ function CurrencyRow({ code, value, onPick, label, big, accent }: { code: string
   const c = CURRENCY_BY_CODE[code]
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <button onClick={onPick} className="flex shrink-0 items-center gap-2 rounded-full bg-white/[0.05] py-1.5 pr-2.5 pl-2 hover:bg-white/10">
+      <button onClick={onPick} className="flex shrink-0 items-center gap-2 rounded-full bg-veil/[0.05] py-1.5 pr-2.5 pl-2 hover:bg-veil/10">
         <span className="text-lg leading-none">{c?.region === 'EU' ? '🇪🇺' : flag(c?.region ?? '')}</span>
         <span className="font-mono text-sm font-medium">{code}</span>
         <ChevronDown size={14} className="text-fog-500" />
@@ -237,7 +237,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     <Pressable
       haptics="select"
       onClick={onClick}
-      className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-medium transition-colors ${active ? 'bg-ember-500 text-ink-900' : 'bg-ink-800 text-fog-300 hairline border'}`}
+      className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-medium transition-colors ${active ? 'bg-ember-500 text-onaccent' : 'bg-ink-800 text-fog-300 hairline border'}`}
     >
       {children}
     </Pressable>

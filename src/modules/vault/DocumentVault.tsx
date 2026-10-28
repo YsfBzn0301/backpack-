@@ -3,22 +3,18 @@ import { FileText, Image as ImageIcon, KeyRound, Loader2, Lock, Plus, ShieldChec
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { addDoc, deleteDoc, isVaultSetUp, listDocs, openDoc, setupVault, unlockVault, type DocInfo, type DocLabel } from '@/lib/vault'
 import { haptic } from '@/lib/haptics'
-import { relativeTime } from '@/lib/format'
+import { relativeTime } from '@/i18n/format'
+import { useTranslation } from 'react-i18next'
 import { Pressable } from '@/components/ui/Pressable'
 
-const LABELS: { id: DocLabel; label: string }[] = [
-  { id: 'passport', label: 'Passport / ID' },
-  { id: 'visa', label: 'Visa' },
-  { id: 'insurance', label: 'Insurance' },
-  { id: 'booking', label: 'Booking' },
-  { id: 'other', label: 'Other' },
-]
+const LABELS: DocLabel[] = ['passport', 'visa', 'insurance', 'booking', 'other']
 const AUTO_LOCK_MS = 5 * 60_000
 
 // The key lives only in memory, for this tab, until locked.
 let sessionKey: CryptoKey | null = null
 
 export function DocumentVault() {
+  const { t } = useTranslation()
   const [setUp, setSetUp] = useState<boolean | null>(null)
   const [key, setKey] = useState<CryptoKey | null>(sessionKey)
   const [docs, setDocs] = useState<DocInfo[]>([])
@@ -67,41 +63,41 @@ export function DocumentVault() {
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-2xl bg-moss-400/10 px-4 py-2.5 text-xs text-moss-400">
         <span className="flex items-center gap-2">
-          <ShieldCheck size={15} /> Unlocked · AES-256, stored only on this device
+          <ShieldCheck size={15} /> {t('vault.unlocked')}
         </span>
         <button onClick={lock} className="flex items-center gap-1 font-medium text-fog-100">
-          <Lock size={13} /> Lock
+          <Lock size={13} /> {t('vault.lock')}
         </button>
       </div>
 
       <AddDoc onAdd={async (file, label) => setDocs([await addDoc(key, file, label), ...docs])} />
 
       {docs.length === 0 ? (
-        <p className="card p-4 text-sm text-fog-400">Add photos of your passport, visa, insurance policy and bookings. They stay readable with no signal.</p>
+        <p className="card p-4 text-sm text-fog-400">{t('vault.empty')}</p>
       ) : (
         <ul className="space-y-1.5">
           {docs.map((d) => (
             <li key={d.id} className="card flex items-center gap-3 p-3">
               <button onClick={() => view(d)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/5 text-fog-300">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-veil/5 text-fog-300">
                   {d.type.startsWith('image/') ? <ImageIcon size={18} /> : <FileText size={18} />}
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium text-fog-50">{d.name}</span>
                   <span className="block text-xs text-fog-500">
-                    {LABELS.find((l) => l.id === d.label)?.label} · {d.size < 1024 ? `${d.size} B` : d.size < 1024 ** 2 ? `${Math.round(d.size / 1024)} KB` : `${(d.size / 1024 ** 2).toFixed(1)} MB`} · {relativeTime(d.addedAt)}
+                    {t(`vault.label.${d.label}`)} · {d.size < 1024 ? `${d.size} B` : d.size < 1024 ** 2 ? `${Math.round(d.size / 1024)} KB` : `${(d.size / 1024 ** 2).toFixed(1)} MB`} · {relativeTime(d.addedAt)}
                   </span>
                 </span>
               </button>
               <button
                 onClick={async () => {
-                  if (!confirm(`Delete "${d.name}" from the vault? This cannot be undone.`)) return
+                  if (!confirm(t('vault.deleteConfirm', { name: d.name }))) return
                   await deleteDoc(d.id)
                   setDocs(docs.filter((x) => x.id !== d.id))
                   haptic('warn')
                 }}
                 className="grid h-9 w-9 place-items-center rounded-full text-fog-500 hover:bg-alert-500/10 hover:text-alert-500"
-                aria-label={`Delete ${d.name}`}
+                aria-label={t('vault.deleteLabel', { name: d.name })}
               >
                 <Trash2 size={15} />
               </button>
@@ -120,8 +116,8 @@ export function DocumentVault() {
                   URL.revokeObjectURL(viewing.url)
                   setViewing(null)
                 }}
-                className="grid h-10 w-10 place-items-center rounded-full bg-white/10"
-                aria-label="Close"
+                className="grid h-10 w-10 place-items-center rounded-full bg-veil/10"
+                aria-label={t('common.close')}
               >
                 <X size={18} />
               </button>
@@ -133,7 +129,7 @@ export function DocumentVault() {
                 <iframe src={viewing.url} title={viewing.info.name} className="h-full w-full rounded-xl bg-white" />
               ) : (
                 <a href={viewing.url} download={viewing.info.name} className="text-ember-400 underline">
-                  Download {viewing.info.name}
+                  {t('vault.download', { name: viewing.info.name })}
                 </a>
               )}
             </div>
@@ -145,6 +141,7 @@ export function DocumentVault() {
 }
 
 function Unlock({ setUp, onKey }: { setUp: boolean; onKey: (k: CryptoKey) => void }) {
+  const { t } = useTranslation()
   const [pass, setPass] = useState('')
   const [confirmPass, setConfirm] = useState('')
   const [err, setErr] = useState<string | null>(null)
@@ -154,8 +151,8 @@ function Unlock({ setUp, onKey }: { setUp: boolean; onKey: (k: CryptoKey) => voi
     e.preventDefault()
     setErr(null)
     if (!setUp) {
-      if (pass.length < 6) return setErr('Use at least 6 characters.')
-      if (pass !== confirmPass) return setErr("Passphrases don't match.")
+      if (pass.length < 6) return setErr(t('vault.tooShort'))
+      if (pass !== confirmPass) return setErr(t('vault.mismatch'))
     }
     setBusy(true)
     try {
@@ -164,7 +161,7 @@ function Unlock({ setUp, onKey }: { setUp: boolean; onKey: (k: CryptoKey) => voi
       onKey(k)
     } catch (e) {
       haptic('warn')
-      setErr(e instanceof Error ? e.message : 'Could not unlock')
+      setErr(e instanceof Error && e.message === 'Wrong passphrase' ? t('vault.wrong') : t('vault.unlockFailed'))
     } finally {
       setBusy(false)
     }
@@ -175,18 +172,16 @@ function Unlock({ setUp, onKey }: { setUp: boolean; onKey: (k: CryptoKey) => voi
       <span className="grid h-12 w-12 place-items-center rounded-2xl bg-ember-500/15 text-ember-500">
         <KeyRound size={22} />
       </span>
-      <h3 className="mt-4 text-lg font-medium">{setUp ? 'Unlock your vault' : 'Create your document vault'}</h3>
+      <h3 className="mt-4 text-lg font-medium">{setUp ? t('vault.unlockTitle') : t('vault.createTitle')}</h3>
       <p className="mt-1 text-sm text-fog-400">
-        {setUp
-          ? 'Enter your passphrase. The vault locks again when you leave the app or after 5 minutes idle.'
-          : 'Files are encrypted on this device with a key made from your passphrase. Nothing is uploaded. If you forget the passphrase, the files cannot be recovered.'}
+        {setUp ? t('vault.unlockBody') : t('vault.createBody')}
       </p>
       <input
         type="password"
         autoComplete={setUp ? 'current-password' : 'new-password'}
         value={pass}
         onChange={(e) => setPass(e.target.value)}
-        placeholder="Passphrase"
+        placeholder={t('vault.passphrase')}
         className="mt-4 w-full rounded-xl bg-ink-900 px-4 py-3 outline-none hairline border focus:border-ember-500/40"
       />
       {!setUp && (
@@ -195,20 +190,21 @@ function Unlock({ setUp, onKey }: { setUp: boolean; onKey: (k: CryptoKey) => voi
           autoComplete="new-password"
           value={confirmPass}
           onChange={(e) => setConfirm(e.target.value)}
-          placeholder="Repeat passphrase"
+          placeholder={t('vault.repeat')}
           className="mt-2 w-full rounded-xl bg-ink-900 px-4 py-3 outline-none hairline border focus:border-ember-500/40"
         />
       )}
       {err && <p className="mt-2 text-sm text-alert-500">{err}</p>}
       <button disabled={busy || !pass} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-fog-100 py-3 text-sm font-semibold text-ink-900 disabled:opacity-40">
         {busy && <Loader2 size={15} className="animate-spin" />}
-        {setUp ? 'Unlock' : 'Create vault'}
+        {setUp ? t('vault.unlock') : t('vault.create')}
       </button>
     </form>
   )
 }
 
 function AddDoc({ onAdd }: { onAdd: (file: File, label: DocLabel) => Promise<void> }) {
+  const { t } = useTranslation()
   const input = useRef<HTMLInputElement>(null)
   const [label, setLabel] = useState<DocLabel>('passport')
   const [busy, setBusy] = useState(false)
@@ -216,21 +212,17 @@ function AddDoc({ onAdd }: { onAdd: (file: File, label: DocLabel) => Promise<voi
     <div className="card p-3">
       <div className="no-scrollbar flex gap-1.5 overflow-x-auto" data-no-swipe>
         {LABELS.map((l) => (
-          <button
-            key={l.id}
-            onClick={() => setLabel(l.id)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${label === l.id ? 'bg-fog-100 text-ink-900' : 'bg-white/5 text-fog-400'}`}
-          >
-            {l.label}
+          <button key={l} onClick={() => setLabel(l)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${label === l ? 'bg-fog-100 text-ink-900' : 'bg-veil/5 text-fog-400'}`}>
+            {t(`vault.label.${l}`)}
           </button>
         ))}
       </div>
       <Pressable
         onClick={() => input.current?.click()}
         disabled={busy}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 py-3 text-sm text-fog-300"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-veil/15 py-3 text-sm text-fog-300"
       >
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add photo or PDF
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} {t('vault.add')}
       </Pressable>
       <input
         ref={input}

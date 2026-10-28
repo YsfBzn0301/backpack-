@@ -1,20 +1,22 @@
-import { useCallback, useEffect } from 'react'
-import { location } from '@/lib/location'
+import { useEffect } from 'react'
+import { location, requestLocation } from '@/lib/location'
 import { distance } from '@/lib/geo'
 
 /**
- * Watches GPS and writes into the shared location store. Ignores jitter under
- * 25 m so agents aren't woken for every tiny fix.
+ * Watches GPS and writes into the shared location store. Mount once (the
+ * agent bridge does). Ignores jitter under 25 m so agents aren't woken for
+ * every fix. Restarts when `requestLocation()` is called, and retries on its
+ * own when the browser permission flips back to "granted".
  */
-export function useGeolocation(enabled = true) {
-  const state = location.use()
+export function useGeolocation() {
+  const retry = location.use((s) => s.retry)
 
-  const request = useCallback(() => {
+  useEffect(() => {
     if (!('geolocation' in navigator)) {
       location.set({ gpsStatus: 'unavailable' })
-      return () => {}
+      return
     }
-    location.set((s) => ({ gpsStatus: s.gps ? s.gpsStatus : 'locating' }))
+    location.set((s) => ({ gpsStatus: s.gps && s.gpsStatus === 'ok' ? 'ok' : 'locating' }))
     const id = navigator.geolocation.watchPosition(
       (pos) => {
         const next = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, at: Date.now() }
@@ -29,12 +31,18 @@ export function useGeolocation(enabled = true) {
       { enableHighAccuracy: true, maximumAge: 30_000, timeout: 20_000 },
     )
     return () => navigator.geolocation.clearWatch(id)
-  }, [])
+  }, [retry])
 
   useEffect(() => {
-    if (!enabled) return
-    return request()
-  }, [enabled, request])
-
-  return { ...state, retry: request }
+    let status: PermissionStatus | null = null
+    const onChange = () => status?.state === 'granted' && location.get().gpsStatus !== 'ok' && requestLocation()
+    navigator.permissions
+      ?.query({ name: 'geolocation' as PermissionName })
+      .then((s) => {
+        status = s
+        s.addEventListener('change', onChange)
+      })
+      .catch(() => {})
+    return () => status?.removeEventListener('change', onChange)
+  }, [])
 }

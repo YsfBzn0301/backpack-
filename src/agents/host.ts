@@ -11,6 +11,7 @@
 import { useSyncExternalStore } from 'react'
 import type { AgentContext, AgentName, AgentStatus, HostMessage, Insight, ToolCalls, ToolName, WorkerMessage } from './protocol'
 import { nearby } from '@/services/places'
+import { parkingNearby } from '@/services/parking'
 
 type Factory = () => Worker
 
@@ -21,11 +22,13 @@ const FACTORIES: Record<AgentName, Factory> = {
   safety: () => new Worker(new URL('./safety.worker.ts', import.meta.url), { type: 'module', name: 'SafetyAgent' }),
 }
 
-export const AGENT_META: Record<AgentName, { label: string; role: string }> = {
-  scout: { label: 'Scout', role: 'Proximity & recommendations' },
-  translate: { label: 'Translate', role: 'Voice & phrase translation' },
-  budget: { label: 'Budget', role: 'Currency & expenses' },
-  safety: { label: 'Safety', role: 'Geofence & emergency' },
+export const AGENT_NAMES: AgentName[] = ['scout', 'translate', 'budget', 'safety']
+
+export const AGENT_COLOR: Record<AgentName, string> = {
+  scout: '#ffb347',
+  translate: '#6cb6ff',
+  budget: '#5fd39a',
+  safety: '#ff4d5e',
 }
 
 export type BusEvent =
@@ -43,6 +46,8 @@ class AgentHost {
   private listeners = new Set<(e: BusEvent) => void>()
   private tools: { [K in ToolName]: ToolHandler<K> } = {
     'places.nearby': (args) => nearby(args),
+    'parking.nearby': (args) => parkingNearby(args),
+    'agent.run': (args) => this.run(args.agent, args.task, args.payload),
   }
 
   context: AgentContext | null = null

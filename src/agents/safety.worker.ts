@@ -7,7 +7,8 @@ import { get, set, createStore } from 'idb-keyval'
 import { defineAgent, fetchJson, localHour, type AgentApi } from './runtime'
 import { COUNTRIES, FALLBACK_COUNTRY, TZ_COUNTRY, getCountry, type Country } from '@/data/countries'
 import { distance } from '@/lib/geo'
-import type { Coords, Place } from './protocol'
+import { msg, type Coords, type Place } from './protocol'
+import { getRoadRules } from '@/data/roadRules'
 
 export interface Medical extends Place {
   distance: number
@@ -33,17 +34,40 @@ async function reverseGeocode(c: Coords) {
 }
 
 function announce(api: AgentApi<SafetyState>, country: Country, first: boolean, preview: boolean) {
-  const nums = [`Police ${country.police}`, `Ambulance ${country.ambulance}`, `Fire ${country.fire}`]
-  if (country.tourist) nums.push(`Tourist police ${country.tourist}`)
+  const c = { t: 'country' as const, code: country.code }
+  const nums = msg(country.tourist ? 'agents.safety.numbersTourist' : 'agents.safety.numbers', {
+    police: country.police,
+    ambulance: country.ambulance,
+    fire: country.fire,
+    tourist: country.tourist ?? '',
+  })
   api.emit({
     key: 'safety-country',
     kind: first || preview ? 'info' : 'alert',
     priority: first || preview ? 1 : 3,
     ttl: 6 * 3600_000,
-    title: preview ? `Previewing ${country.name}: emergency numbers` : first ? `Emergency numbers for ${country.name}` : `Welcome to ${country.name}`,
-    body: `${first || preview ? '' : 'Emergency numbers updated. '}${nums.join(' · ')}.`,
-    action: { label: 'Open SOS', type: 'sos' },
+    title: msg(preview ? 'agents.safety.previewTitle' : first ? 'agents.safety.numbersTitle' : 'agents.safety.welcomeTitle', { country: c }),
+    body: first || preview ? nums : msg('agents.safety.updatedBody', { numbers: nums }),
+    action: { label: msg('actions.openSos'), type: 'sos' },
   })
+  // Road-trip mode: headline toll and driving rules for the new country.
+  const rules = getRoadRules(country.code)
+  const ctx = api.context()
+  if (rules && ctx?.driving) {
+    api.emit({
+      key: 'safety-road',
+      kind: rules.toll === 'vignette' ? 'alert' : 'info',
+      priority: rules.toll === 'vignette' && !preview ? 2 : 1,
+      ttl: 12 * 3600_000,
+      title: msg('agents.safety.roadTitle', { country: c }),
+      body: msg('agents.safety.roadBody', {
+        side: msg(`road.side.${rules.drive}`),
+        toll: msg(`road.toll.${rules.toll}`),
+        speed: rules.speed.map((v) => (v == null ? '—' : String(v))).join(' / ') + (rules.unit === 'mph' ? ' mph' : ' km/h'),
+      }),
+      action: { label: msg('actions.parking'), type: 'parking' },
+    })
+  } else api.retract('safety-road')
 }
 
 async function resolveCountry(api: AgentApi<SafetyState>) {
@@ -127,8 +151,8 @@ function situational(api: AgentApi<SafetyState>) {
       kind: 'alert',
       priority: 2,
       ttl: 3 * 3600_000,
-      title: `Heat advisory: ${Math.round(w.tempC)}°C`,
-      body: 'Drink water before you feel thirsty, keep to shade from 11:00 to 15:00, and watch for dizziness or headache.',
+      title: msg('agents.safety.heatTitle', { temp: { t: 'temp', c: w.tempC } }),
+      body: msg('agents.safety.heatBody'),
     })
   } else if (w?.kind === 'thunder') {
     api.emit({
@@ -136,8 +160,8 @@ function situational(api: AgentApi<SafetyState>) {
       kind: 'alert',
       priority: 2,
       ttl: 2 * 3600_000,
-      title: 'Thunderstorm nearby',
-      body: 'Stay off beaches, boats and open ground. Wait 30 minutes after the last thunder before heading out.',
+      title: msg('agents.safety.stormTitle'),
+      body: msg('agents.safety.stormBody'),
     })
   } else api.retract('safety-weather')
 
@@ -148,9 +172,9 @@ function situational(api: AgentApi<SafetyState>) {
       kind: 'info',
       priority: 0,
       ttl: 2 * 3600_000,
-      title: 'Late night out',
-      body: `Use registered taxis or ride-hailing. ${country.tourist ? `Tourist police: ${country.tourist}.` : `Police: ${country.police}.`}`,
-      action: { label: 'SOS', type: 'sos' },
+      title: msg('agents.safety.nightTitle'),
+      body: msg(country.tourist ? 'agents.safety.nightBodyTourist' : 'agents.safety.nightBody', { n: country.tourist ?? country.police }),
+      action: { label: msg('actions.sos'), type: 'sos' },
     })
   } else api.retract('safety-night')
 }
