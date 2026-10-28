@@ -8,6 +8,7 @@ import { UI_LANGS } from '@/i18n'
 import { countryName, fmtMoney } from '@/i18n/format'
 import { openHelp, ui } from '@/lib/ui'
 import { haptic } from '@/lib/haptics'
+import { KeyHelp } from '@/components/KeyHelp'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 import { Segmented } from '@/components/ui/Segmented'
 import { AGENT_COLOR, AGENT_NAMES, useAgents } from '@/agents/host'
@@ -164,9 +165,14 @@ export function SettingsScreen() {
         </SectionTitle>
         <div className="card space-y-3 p-4">
           <p className="text-xs leading-relaxed text-fog-500">{t('settings.keysHint')}</p>
-          <KeyInput label={t('settings.googleKey')} value={s.googleMapsKey} onChange={(v) => settings.set({ googleMapsKey: v })} note={t('settings.reloadNote')} />
-          <KeyInput label={t('settings.owmKey')} value={s.openWeatherKey} onChange={(v) => settings.set({ openWeatherKey: v })} />
+          <KeyHelp service="google" variant="inline" />
+          <KeyInput id="key-google" label={t('settings.googleKey')} value={s.googleMapsKey} onChange={(v) => settings.set({ googleMapsKey: v })} note={t('settings.reloadNote')} />
+          <KeyHelp service="openweather" variant="inline" />
+          <KeyInput id="key-openweather" label={t('settings.owmKey')} value={s.openWeatherKey} onChange={(v) => settings.set({ openWeatherKey: v })} />
+          <KeyHelp service="audd" variant="inline" />
           <KeyInput id="key-audd" label={t('settings.auddKey')} value={s.auddToken} onChange={(v) => settings.set({ auddToken: v })} />
+          <KeyHelp service="oxr" variant="inline" />
+          <KeyInput id="key-oxr" label={t('keyHelp.oxrLabel')} value={s.oxrAppId} onChange={(v) => settings.set({ oxrAppId: v })} />
           <KeyInput label={t('settings.translateEndpoint')} value={s.translateEndpoint} onChange={(v) => settings.set({ translateEndpoint: v })} type="url" />
         </div>
       </section>

@@ -5,6 +5,8 @@
  * request, publish state and insights, and call "tools" that the host fulfils
  * (anything that needs window-only APIs, such as the Google Places SDK).
  */
+import type { SharingData } from '@/services/sharing'
+
 export type AgentName = 'scout' | 'translate' | 'budget' | 'safety'
 
 /**
@@ -96,7 +98,7 @@ export interface Place {
 
 export interface InsightAction {
   label: Msg
-  type: 'tab' | 'screen' | 'sos' | 'directions' | 'place' | 'parking'
+  type: 'tab' | 'screen' | 'sos' | 'directions' | 'place' | 'parking' | 'sharing'
   payload?: unknown
 }
 
@@ -165,6 +167,8 @@ export interface ParkingLot {
 export interface ToolCalls {
   'places.nearby': { args: { lat: number; lng: number; radius: number; kinds: PlaceKind[]; limit?: number }; result: Place[] }
   'parking.nearby': { args: { lat: number; lng: number; radius: number; country?: string }; result: ParkingLot[] }
+  /** E-scooter / bike sharing around a point (Transitous GBFS aggregation). */
+  'sharing.nearby': { args: { lat: number; lng: number; radius: number }; result: SharingData }
   /** Ask another agent to run a task; the host routes it. */
   'agent.run': { args: { agent: AgentName; task: string; payload?: unknown }; result: unknown }
 }

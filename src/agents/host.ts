@@ -12,6 +12,7 @@ import { useSyncExternalStore } from 'react'
 import type { AgentContext, AgentName, AgentStatus, HostMessage, Insight, ToolCalls, ToolName, WorkerMessage } from './protocol'
 import { nearby } from '@/services/places'
 import { parkingNearby } from '@/services/parking'
+import { sharingNearby } from '@/services/sharing'
 
 type Factory = () => Worker
 
@@ -47,6 +48,7 @@ class AgentHost {
   private tools: { [K in ToolName]: ToolHandler<K> } = {
     'places.nearby': (args) => nearby(args),
     'parking.nearby': (args) => parkingNearby(args),
+    'sharing.nearby': (args) => sharingNearby(args),
     'agent.run': (args) => this.run(args.agent, args.task, args.payload),
   }
 

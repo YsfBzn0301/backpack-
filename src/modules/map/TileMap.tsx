@@ -16,6 +16,17 @@ export interface Overlay {
   node: ReactNode
 }
 
+/** A translucent polygon drawn under the overlays (e.g. a no-parking zone). */
+export interface Shape {
+  key: string
+  /** Polygons → rings (first outer, rest holes) → [lat, lng]. */
+  polygons: [number, number][][][]
+  /** Hex colour; fill and outline opacities are applied separately. */
+  color: string
+  fillOpacity: number
+  strokeOpacity: number
+}
+
 const TILE = 256
 const clampLat = (lat: number) => Math.max(-85, Math.min(85, lat))
 const project = (lat: number, lng: number, z: number) => {
@@ -34,6 +45,7 @@ export function TileMap({
   center,
   zoom: initialZoom = 15,
   overlays,
+  shapes,
   radius,
   onBackgroundClick,
   recenterKey,
@@ -42,6 +54,7 @@ export function TileMap({
   center: { lat: number; lng: number }
   zoom?: number
   overlays: Overlay[]
+  shapes?: Shape[]
   radius?: { lat: number; lng: number; meters: number }
   onBackgroundClick?: () => void
   recenterKey?: string
@@ -127,6 +140,34 @@ export function TileMap({
           className="pointer-events-none absolute rounded-full border border-ember-500/40 bg-ember-500/[0.06]"
           style={{ left: rc.x - origin.x - radiusPx, top: rc.y - origin.y - radiusPx, width: radiusPx * 2, height: radiusPx * 2 }}
         />
+      )}
+      {shapes && shapes.length > 0 && (
+        <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
+          {shapes.map((s) => (
+            <path
+              key={s.key}
+              fillRule="evenodd"
+              fill={s.color}
+              fillOpacity={s.fillOpacity}
+              stroke={s.color}
+              strokeOpacity={s.strokeOpacity}
+              strokeWidth={1}
+              d={s.polygons
+                .flatMap((poly) =>
+                  poly.map(
+                    (ring) =>
+                      ring
+                        .map(([la, ln], i) => {
+                          const p = project(la, ln, view.z)
+                          return `${i ? 'L' : 'M'}${(p.x - origin.x).toFixed(1)} ${(p.y - origin.y).toFixed(1)}`
+                        })
+                        .join('') + 'Z',
+                  ),
+                )
+                .join('')}
+            />
+          ))}
+        </svg>
       )}
       {overlays.map((o) => {
         const p = project(o.lat, o.lng, view.z)

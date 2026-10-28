@@ -1,7 +1,7 @@
-import { CircleF, GoogleMap, OverlayViewF, OVERLAY_MOUSE_TARGET } from '@react-google-maps/api'
+import { CircleF, GoogleMap, OverlayViewF, OVERLAY_MOUSE_TARGET, PolygonF } from '@react-google-maps/api'
 import { useEffect, useRef } from 'react'
 import { DARK_MAP_STYLE } from './mapStyle'
-import type { Overlay } from './TileMap'
+import type { Overlay, Shape } from './TileMap'
 
 const options = (theme: 'dark' | 'light'): google.maps.MapOptions => ({
   disableDefaultUI: true,
@@ -16,6 +16,7 @@ const options = (theme: 'dark' | 'light'): google.maps.MapOptions => ({
 export function GoogleMapView({
   center,
   overlays,
+  shapes,
   radius,
   onBackgroundClick,
   recenterKey,
@@ -24,6 +25,7 @@ export function GoogleMapView({
 }: {
   center: { lat: number; lng: number }
   overlays: Overlay[]
+  shapes?: Shape[]
   radius?: { lat: number; lng: number; meters: number }
   onBackgroundClick?: () => void
   recenterKey?: string
@@ -54,6 +56,15 @@ export function GoogleMapView({
           radius={radius.meters}
           options={{ strokeColor: '#ff6b4a', strokeOpacity: 0.4, strokeWeight: 1, fillColor: '#ff6b4a', fillOpacity: 0.05, clickable: false }}
         />
+      )}
+      {shapes?.flatMap((s) =>
+        s.polygons.map((poly, i) => (
+          <PolygonF
+            key={`${s.key}-${i}`}
+            paths={poly.map((ring) => ring.map(([lat, lng]) => ({ lat, lng })))}
+            options={{ fillColor: s.color, fillOpacity: s.fillOpacity, strokeColor: s.color, strokeOpacity: s.strokeOpacity, strokeWeight: 1, clickable: false }}
+          />
+        )),
       )}
       {overlays.map((o) => (
         <OverlayViewF key={o.key} position={{ lat: o.lat, lng: o.lng }} mapPaneName={OVERLAY_MOUSE_TARGET}>

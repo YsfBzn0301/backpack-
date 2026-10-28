@@ -1,6 +1,7 @@
 import type { UseQueryResult } from '@tanstack/react-query'
 import type { Weather } from '@/services/weather'
 import { WeatherCard } from '@/components/weather/WeatherCard'
+import { KeyHelp } from '@/components/KeyHelp'
 import { location } from '@/lib/location'
 import { ui } from '@/lib/ui'
 import { AgentTicker, InsightList } from './AgentFeed'
@@ -17,6 +18,7 @@ export function HomeModule({ weather, placeName }: { weather: UseQueryResult<Wea
   return (
     <div className="space-y-5">
       {blocked ? <LocationPermissionCard /> : <WeatherCard query={weather} placeName={placeName} onLocate={() => ui.set({ searchOpen: true })} />}
+      {!blocked && <KeyHelp service="openweather" variant="compact" />}
       <BackpackDailyQuote />
       <QuickActions />
       <AgentTicker />

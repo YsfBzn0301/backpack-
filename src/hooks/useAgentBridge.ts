@@ -33,7 +33,7 @@ export function useAgentBridge() {
   }, [s.translateEndpoint])
   useEffect(() => {
     agents.run('budget', 'configure', { oxrAppId: keys.oxr() }).catch(() => {})
-  }, [])
+  }, [s.oxrAppId])
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000)

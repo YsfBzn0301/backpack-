@@ -13,6 +13,7 @@ import { fmtMoney as formatMoney, fmtNumber as formatNumber, relativeTime } from
 import { useMsg } from '@/i18n/msg'
 import { useTranslation } from 'react-i18next'
 import { haptic } from '@/lib/haptics'
+import { KeyHelp } from '@/components/KeyHelp'
 import { Pressable } from '@/components/ui/Pressable'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 import { CurrencyPicker } from './CurrencyPicker'
@@ -112,6 +113,8 @@ export function ConvertModule() {
         </div>
         {error && fx.source === 'seed' && <p className="mt-1 text-[11px] text-amber-glow">{t('money.providerError')}</p>}
       </section>
+
+      <KeyHelp service="oxr" variant="compact" />
 
       <div className="no-scrollbar flex items-center gap-2 overflow-x-auto" data-no-swipe>
         {TIPS.map((tp) => (

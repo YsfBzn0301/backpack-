@@ -35,6 +35,8 @@ export const ui = createStore({
   mapMode: (params.get('mode') === 'parking' || action === 'parking' ? 'parking' : 'places') as 'places' | 'parking',
   /** Hand-offs between modules. */
   mapFocus: null as null | { lat: number; lng: number; name?: string },
+  /** Explore chip to select when the map opens, e.g. 'sharing'. */
+  mapFilter: null as null | string,
   scanFile: null as File | null,
 })
 

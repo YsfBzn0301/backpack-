@@ -21,6 +21,10 @@ export function runAction(action: InsightAction) {
       window.open(directionsUrl(p, 'walking', p.id), '_blank', 'noopener')
       break
     }
+    case 'sharing':
+      ui.set({ mapMode: 'places', mapFilter: 'sharing' })
+      goTab('map')
+      break
     case 'place': {
       const p = action.payload as { lat: number; lng: number; name?: string }
       ui.set({ mapFocus: p, mapMode: 'places' })

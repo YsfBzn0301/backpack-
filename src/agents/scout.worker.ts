@@ -7,6 +7,7 @@
 import { defineAgent, localHour, type AgentApi } from './runtime'
 import { msg, type AgentContext, type Msg, type ParkingLot, type Place, type PlaceKind } from './protocol'
 import { distance, walkMinutes } from '@/lib/geo'
+import type { SharingData } from '@/services/sharing'
 import { estimateParking, parkingNow, summarizeRates, type ParkingEstimate, type ParkingNow, type RateSummary } from '@/lib/parking-cost'
 
 export type IntentId = 'breakfast' | 'lunch' | 'break' | 'dinner' | 'late' | 'cool' | 'shelter' | 'warm' | 'explore'
@@ -184,6 +185,48 @@ async function scanParking(api: AgentApi<ScoutState>) {
   })
 }
 
+/* ---------- Sharing (e-scooters, bikes) ---------- */
+
+/** Best nearby sharing offer worth an insight: available vehicles within `within` metres. */
+export function sharingHighlight(data: SharingData, within = 300) {
+  let best: { provider: string; kind: string; n: number; nearest: number } | null = null
+  for (const p of data.providers) {
+    const near = data.vehicles.filter((v) => v.providerId === p.id && v.distance <= within)
+    const docked = data.stations.filter((s) => s.providerId === p.id && s.distance <= within).reduce((a, s) => a + s.available, 0)
+    const n = near.length + docked
+    if (!n) continue
+    const nearest = Math.min(near[0]?.distance ?? Infinity, data.stations.find((s) => s.providerId === p.id && s.available > 0)?.distance ?? Infinity)
+    const kinds = Object.entries(p.counts).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+    if (!best || n > best.n) best = { provider: p.name, kind: kinds[0]?.[0] ?? 'other', n, nearest }
+  }
+  return best
+}
+
+let lastSharing: { lat: number; lng: number; at: number } | null = null
+
+async function scanSharing(api: AgentApi<ScoutState>) {
+  const ctx = api.context()
+  if (!ctx?.coords || !ctx.online || ctx.driving || ctx.source !== 'gps') return
+  const moved = lastSharing ? distance(lastSharing, ctx.coords) : Infinity
+  if (moved < 200 && ctx.now - (lastSharing?.at ?? 0) < 10 * 60_000) return
+  lastSharing = { ...ctx.coords, at: ctx.now }
+  const data = await api.tool('sharing.nearby', { lat: ctx.coords.lat, lng: ctx.coords.lng, radius: 500 })
+  const best = sharingHighlight(data)
+  if (!best) {
+    api.retract('scout-sharing')
+    return
+  }
+  api.emit({
+    key: 'scout-sharing',
+    kind: 'info',
+    priority: 0,
+    ttl: 10 * 60_000,
+    title: msg('agents.scout.sharingTitle', { kind: msg(`scooters.kindPlural.${best.kind}`) }),
+    body: msg('agents.scout.sharingBody', { n: best.n, provider: best.provider, dist: { t: 'dist', m: best.nearest } }),
+    action: { label: msg('scooters.showMap'), type: 'sharing' },
+  })
+}
+
 let lastScan: { lat: number; lng: number; at: number; kind?: string; intents: string } | null = null
 
 async function scan(api: AgentApi<ScoutState>, force = false) {
@@ -252,6 +295,7 @@ defineAgent<ScoutState>({
     }
     api.publish({ intents: deriveIntents(ctx) })
     await scan(api)
+    scanSharing(api).catch(() => {})
     if (ctx.driving) await scanParking(api).catch(() => {})
     else api.retract('scout-parking')
   },

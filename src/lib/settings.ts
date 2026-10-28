@@ -19,6 +19,7 @@ export interface Settings {
   /** Keys pasted in-app override build-time env keys. Stored on this device only. */
   googleMapsKey: string
   openWeatherKey: string
+  oxrAppId: string
   translateEndpoint: string
   speechLang: string
   targetLang: string
@@ -73,6 +74,7 @@ export const settings = createStore<Settings>(
     scoutRadius: 1000,
     googleMapsKey: '',
     openWeatherKey: '',
+    oxrAppId: '',
     translateEndpoint: '',
     speechLang: guessUiLang(),
     targetLang: 'th',
@@ -83,7 +85,7 @@ export const settings = createStore<Settings>(
 export const keys = {
   googleMaps: () => settings.get().googleMapsKey || import.meta.env.VITE_GOOGLE_MAPS_KEY || '',
   openWeather: () => settings.get().openWeatherKey || import.meta.env.VITE_OPENWEATHER_KEY || '',
-  oxr: () => import.meta.env.VITE_OXR_APP_ID || '',
+  oxr: () => settings.get().oxrAppId || import.meta.env.VITE_OXR_APP_ID || '',
   translateEndpoint: () => settings.get().translateEndpoint || import.meta.env.VITE_TRANSLATE_ENDPOINT || '',
   audd: () => settings.get().auddToken || import.meta.env.VITE_AUDD_TOKEN || '',
   parking: () => import.meta.env.VITE_PARKING_ENDPOINT || '',

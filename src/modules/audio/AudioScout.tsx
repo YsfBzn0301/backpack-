@@ -7,6 +7,7 @@ import { AudioLines, ExternalLink, History, KeyRound, Loader2, Mic, Pause, Play,
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AudioError, enrich, loadHistory, openMic, recognize, recordClip, saveHistory, searchTracks, spotifyUrl, TOKEN_CODES, type AudioErrorCode, type Track } from '@/services/audio'
+import { KeyHelp } from '@/components/KeyHelp'
 import { keys } from '@/lib/settings'
 import { openSettings } from '@/lib/ui'
 import { haptic } from '@/lib/haptics'
@@ -198,9 +199,9 @@ export function AudioScout() {
         ) : (
           !hasToken &&
           !busy && (
-            <button onClick={() => openSettings('audd')} className="relative mt-1 inline-flex items-center gap-1.5 text-xs text-fog-400 hover:text-fog-100">
-              <KeyRound size={12} /> {t('audio.tokenHint')}
-            </button>
+            <div className="relative mx-auto mt-3 max-w-sm">
+              <KeyHelp service="audd" variant="compact" />
+            </div>
           )
         )}
         {error && <p className="relative mt-2 text-xs text-amber-glow">{error}</p>}

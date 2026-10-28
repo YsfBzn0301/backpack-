@@ -30,6 +30,7 @@ function openTarget(target: OpenTarget) {
     if ('tab' in target) {
       goTab(target.tab)
       if (target.mapMode) ui.set({ mapMode: target.mapMode })
+      if (target.mapFilter) ui.set({ mapFilter: target.mapFilter })
     } else if ('screen' in target) openScreen(target.screen)
     else ui.set(target.overlay === 'sos' ? { sosOpen: true } : target.overlay === 'camera' ? { cameraOpen: true } : { scannerOpen: true })
   }, 50)

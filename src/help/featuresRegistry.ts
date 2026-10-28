@@ -18,6 +18,7 @@ import {
   Palette,
   Quote,
   Radar,
+  Scooter,
   ScanLine,
   ShieldAlert,
   Siren,
@@ -50,7 +51,7 @@ export type DemoId =
   | 'theme'
   | 'agent'
 
-export type OpenTarget = { tab: Tab; mapMode?: 'places' | 'parking' } | { screen: Screen } | { overlay: 'sos' | 'camera' | 'scanner' }
+export type OpenTarget = { tab: Tab; mapMode?: 'places' | 'parking'; mapFilter?: string } | { screen: Screen } | { overlay: 'sos' | 'camera' | 'scanner' }
 
 export interface FeatureEntry {
   id: string
@@ -104,7 +105,16 @@ export const featuresRegistry: FeatureEntry[] = [
     agent: 'scout',
     demo: 'map',
     open: { tab: 'map', mapMode: 'places' },
-    fallback: { title: 'Map & nearby scout', summary: 'A dark map of ATMs, hostels, food, pharmacies, gas stations and more.', steps: ['Pick a category or search.', 'Scout ranks results by time, weather, rating and distance.', 'Tap a place for walking, transit or driving directions.'] },
+    fallback: { title: 'Map & nearby scout', summary: 'A dark map of ATMs, hostels, food, e-scooters & bikes, pharmacies, gas stations and more.', steps: ['Pick a category or search.', 'Scout ranks results by time, weather, rating and distance.', 'Tap a place for walking, transit or driving directions.'] },
+  },
+  {
+    id: 'sharing',
+    group: 'explore',
+    Icon: Scooter,
+    color: '#4fd1c5',
+    agent: 'scout',
+    open: { tab: 'map', mapMode: 'places', mapFilter: 'sharing' },
+    fallback: { title: 'E-scooter & bike sharing', summary: 'Rentable e-scooters, e-bikes, bikes and mopeds from Lime, Voi, Bolt, Dott, nextbike and others, where the city has them.', steps: ['In Explore, pick the “Scooters & bikes” chip.', 'Vehicles show per operator; red areas are no-parking zones.', 'Tap “Open app” to rent in the operator’s app.'] },
   },
   {
     id: 'parking',

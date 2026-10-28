@@ -1,9 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Car, Crosshair, Loader2, LocateFixed, Navigation, Phone, Search, Sparkles, Star, TrainFront, X } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { Car, Crosshair, ExternalLink, Loader2, LocateFixed, Navigation, Phone, RefreshCw, Scooter, Search, SearchX, Sparkles, Star, TrainFront, X } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { agents } from '@/agents/host'
 import type { Place, PlaceKind } from '@/agents/protocol'
 import type { RankedPlace } from '@/agents/scout.worker'
 import { activeCoords, location } from '@/lib/location'
@@ -12,21 +11,27 @@ import { ui } from '@/lib/ui'
 import { haptic } from '@/lib/haptics'
 import { directionsUrl, distance, walkMinutes } from '@/lib/geo'
 import { cap, fmtDistance } from '@/i18n/format'
-import { googleTextSearch, nearby } from '@/services/places'
+import { googleTextSearch } from '@/services/places'
 import { useMapsLoader } from '@/hooks/useMapsLoader'
 import { useOnline } from '@/hooks/useOnline'
+import { KeyHelp } from '@/components/KeyHelp'
 import { Pressable } from '@/components/ui/Pressable'
 import { Segmented } from '@/components/ui/Segmented'
 import { MapView } from './MapView'
-import type { Overlay } from './TileMap'
+import type { Overlay, Shape } from './TileMap'
+import { nearbyCached, placesQuery, PREFETCH } from './placesQuery'
+import { SHARING_MAX_RADIUS } from '@/services/sharing'
+import { SHARING_COLOR, SharingList, sharingOverlays, sharingShapes, SkeletonRows, useSharing } from './SharingLayer'
 import { PlaceMarker, UserDot } from './Marker'
 import { KIND_STYLE } from './kindStyle'
 
 const ParkingScout = lazy(() => import('@/modules/parking/ParkingScout').then((m) => ({ default: m.ParkingScout })))
 
-type Filter = 'scout' | 'atm' | 'hostel' | 'food' | 'pharmacy' | 'fuel' | 'bus' | 'cafe' | 'hospital' | 'parking'
-const FILTERS: Filter[] = ['scout', 'atm', 'hostel', 'food', 'pharmacy', 'fuel', 'parking', 'bus', 'cafe', 'hospital']
-const FILTER_KINDS: Record<Exclude<Filter, 'parking'>, PlaceKind[]> = {
+type Filter = 'scout' | 'atm' | 'hostel' | 'food' | 'sharing' | 'pharmacy' | 'fuel' | 'bus' | 'cafe' | 'hospital' | 'parking'
+type PlaceFilter = Exclude<Filter, 'parking' | 'sharing'>
+const FILTERS: Filter[] = ['scout', 'atm', 'hostel', 'food', 'sharing', 'pharmacy', 'fuel', 'parking', 'bus', 'cafe', 'hospital']
+const isFilter = (f: string | null): f is Exclude<Filter, 'parking'> => f != null && f !== 'parking' && (FILTERS as string[]).includes(f)
+const FILTER_KINDS: Record<PlaceFilter, PlaceKind[]> = {
   scout: ['street_food', 'restaurant', 'cafe', 'convenience', 'atm'],
   atm: ['atm'],
   hostel: ['hostel'],
@@ -42,6 +47,7 @@ const FILTER_COLOR: Record<Filter, string> = {
   atm: KIND_STYLE.atm.color,
   hostel: KIND_STYLE.hostel.color,
   food: KIND_STYLE.street_food.color,
+  sharing: SHARING_COLOR,
   pharmacy: KIND_STYLE.pharmacy.color,
   fuel: KIND_STYLE.fuel.color,
   parking: KIND_STYLE.parking.color,
@@ -122,29 +128,57 @@ function PlacesView() {
   const mapsState = useMapsLoader()
   const online = useOnline()
   const focus = ui.use((s) => s.mapFocus)
-  const [filter, setFilter] = useState<Exclude<Filter, 'parking'>>('scout')
+  const handoff = ui.use((s) => s.mapFilter)
+  const [filter, setFilter] = useState<Exclude<Filter, 'parking'>>(() => (isFilter(handoff) ? handoff : 'scout'))
   const [selected, setSelected] = useState<Place | null>(null)
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Place[] | null>(null)
   const [searching, setSearching] = useState(false)
   const [recenter, setRecenter] = useState('init')
 
-  const kinds = FILTER_KINDS[filter]
-  const lat3 = coords ? coords.lat.toFixed(3) : null
-  const lng3 = coords ? coords.lng.toFixed(3) : null
+  const qc = useQueryClient()
+  const sharingMode = filter === 'sharing'
+  const kinds = FILTER_KINDS[sharingMode ? 'scout' : filter]
+  const google = mapsState === 'ready'
+  const placesReady = Boolean(coords) && mapsState !== 'loading'
 
   const places = useQuery({
-    queryKey: ['places', lat3, lng3, radius, kinds.join(','), mapsState === 'ready'],
-    queryFn: async () => {
-      const raw = await nearby({ lat: coords!.lat, lng: coords!.lng, radius, kinds, limit: 40 })
-      // ScoutAgent ranks the results using time, weather and distance.
-      return agents.run<RankedPlace[]>('scout', 'rank', { places: raw }).catch(() => raw as RankedPlace[])
-    },
-    enabled: Boolean(coords) && mapsState !== 'loading',
-    staleTime: 5 * 60_000,
-    gcTime: 24 * 3600_000,
-    retry: 1,
+    ...placesQuery(coords ?? { lat: 0, lng: 0 }, radius, kinds, google),
+    enabled: placesReady && !sharingMode,
+    // Instant results from a neighbouring cell or a wider cached radius while this one loads.
+    placeholderData: () => (coords ? nearbyCached(qc, coords, radius, kinds, google) : undefined),
   })
+  const sharing = useSharing(coords, radius, sharingMode)
+  // Sharing searches at most 2 km around you; draw that circle instead.
+  const mapRadius = sharingMode && !searchResults ? Math.min(radius, SHARING_MAX_RADIUS) : radius
+
+  useEffect(() => {
+    if (!handoff) return
+    if (isFilter(handoff)) setFilter(handoff)
+    ui.set({ mapFilter: null })
+  }, [handoff])
+
+  // Warm up the common chips in the background once the visible one has loaded,
+  // one request at a time (OSM only: Google Places bills per request).
+  const loaded = places.isSuccess && !places.isPlaceholderData
+  useEffect(() => {
+    if (!loaded || !coords || google || !online) return
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+    if (conn?.saveData) return
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      for (const k of PREFETCH) {
+        if (cancelled) return
+        if (k.join() === kinds.join()) continue
+        await qc.prefetchQuery(placesQuery(coords, radius, k, false)).catch(() => {})
+      }
+    }, 1500)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, coords?.lat, coords?.lng, radius, google, online])
 
   useEffect(() => {
     if (!focus) return
@@ -172,10 +206,10 @@ function PlacesView() {
   }
 
   const list: RankedPlace[] = useMemo(() => {
-    const base = (searchResults ?? places.data ?? []) as RankedPlace[]
+    const base = (searchResults ?? (sharingMode ? [] : places.data?.places) ?? []) as RankedPlace[]
     if (!coords) return base
     return base.map((p) => ({ ...p, distance: p.distance ?? distance(coords, p) }))
-  }, [searchResults, places.data, coords])
+  }, [searchResults, places.data, coords, sharingMode])
 
   const topPick = filter === 'scout' && !searchResults ? list[0] : undefined
 
@@ -196,10 +230,13 @@ function PlacesView() {
         />
       ),
     }))
+    if (sharingMode && !searchResults)
+      o.push(...sharingOverlays(sharing.data, (pr, k) => `${pr.name} · ${t(`scooters.kind.${k}`)}`))
     if (selected && !list.some((p) => p.id === selected.id)) o.push({ key: selected.id, lat: selected.lat, lng: selected.lng, node: <PlaceMarker place={selected} selected onClick={() => {}} /> })
     if (loc.gps) o.push({ key: 'me', lat: loc.gps.lat, lng: loc.gps.lng, node: <UserDot /> })
     return o
-  }, [list, selected, topPick?.id, loc.gps])
+  }, [list, selected, topPick?.id, loc.gps, sharingMode, searchResults, sharing.data, t])
+  const shapes: Shape[] = useMemo(() => (sharingMode && !searchResults ? sharingShapes(sharing.data) : []), [sharingMode, searchResults, sharing.data])
 
   if (!coords) return <NeedLocation />
 
@@ -254,7 +291,11 @@ function PlacesView() {
               }}
               className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium ${active ? 'bg-fog-100 text-ink-900' : 'bg-ink-800 text-fog-300 hairline border'}`}
             >
-              {f === 'scout' ? <Sparkles size={13} style={{ color: active ? undefined : FILTER_COLOR[f] }} /> : <span className="h-2 w-2 rounded-full" style={{ background: FILTER_COLOR[f] }} />}
+              {f === 'scout' ? (
+                <Sparkles size={13} style={{ color: active ? undefined : FILTER_COLOR[f] }} />
+              ) : f === 'sharing' ? (
+                <Scooter size={13} style={{ color: active ? undefined : FILTER_COLOR[f] }} />
+              ) : <span className="h-2 w-2 rounded-full" style={{ background: FILTER_COLOR[f] }} />}
               {t(`map.filter.${f}`)}
             </Pressable>
           )
@@ -262,7 +303,7 @@ function PlacesView() {
       </div>
 
       <div className="card relative h-[46dvh] min-h-[280px] overflow-hidden p-0">
-        <MapView center={selected ?? coords} overlays={overlays} radius={{ ...coords, meters: radius }} recenterKey={`${recenter}-${selected?.id ?? ''}-${radius}`} onBackgroundClick={() => setSelected(null)} />
+        <MapView center={selected ?? coords} overlays={overlays} shapes={shapes} radius={{ ...coords, meters: mapRadius }} recenterKey={`${recenter}-${selected?.id ?? ''}-${mapRadius}`} onBackgroundClick={() => setSelected(null)} />
         <div className="absolute bottom-3 left-3 flex gap-2">
           <Pressable
             onClick={() => {
@@ -285,28 +326,107 @@ function PlacesView() {
           <PlaceDetail key={selected.id} place={selected} origin={coords} onClose={() => setSelected(null)} />
         ) : (
           <motion.section key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {places.isLoading && !searchResults ? (
-              <div className="space-y-2">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="card h-16 animate-pulse" />
-                ))}
-              </div>
-            ) : places.isError && !searchResults ? (
-              <p className="card p-4 text-sm text-fog-400">{online ? t('map.loadFailed') : t('map.needsConnection')}</p>
-            ) : list.length === 0 ? (
-              <p className="card p-4 text-sm text-fog-400">{t('map.nothing', { radius: fmtDistance(radius) })}</p>
+            {sharingMode && !searchResults ? (
+              <SharingList query={sharing} radius={radius} onWiden={() => settings.set({ scoutRadius: 5000 })} />
+            ) : searchResults ? (
+              list.length === 0 ? (
+                <p className="card p-4 text-sm text-fog-400">{t('map.nothing', { radius: fmtDistance(radius) })}</p>
+              ) : (
+                <PlaceList list={list} onSelect={setSelected} />
+              )
+            ) : list.length > 0 ? (
+              <>
+                {places.isFetching && (
+                  <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] text-fog-500" role="status">
+                    <Loader2 size={11} className="animate-spin" /> {t('map.updating')}
+                  </p>
+                )}
+                <PlaceList list={list} pick={topPick} onSelect={setSelected} />
+              </>
+            ) : places.isError ? (
+              <PlacesError filter={filter as PlaceFilter} coords={coords} online={online} timeout={/timeout/.test(String(places.error?.message))} onRetry={() => places.refetch()} />
+            ) : places.fetchStatus === 'paused' ? (
+              <p className="card p-4 text-sm text-fog-400">{t('map.needsConnection')}</p>
+            ) : places.isPending || places.isFetching ? (
+              <SkeletonRows label={t('map.searching', { what: t(`map.what.${filter}`) })} />
             ) : (
-              <ul className="space-y-1.5">
-                {list.slice(0, 15).map((p, i) => (
-                  <PlaceRow key={p.id} place={p} pick={i === 0 && Boolean(topPick)} onClick={() => setSelected(p)} />
-                ))}
-              </ul>
+              <PlacesEmpty filter={filter as PlaceFilter} coords={coords} radius={radius} />
             )}
-            <p className="mt-2 px-1 text-[10px] text-fog-500">{mapsState === 'ready' ? t('map.creditGoogle') : t('map.creditOsm')}</p>
+            <p className="mt-2 px-1 text-[10px] text-fog-500">{sharingMode && !searchResults ? t('scooters.credit') : mapsState === 'ready' ? t('map.creditGoogle') : t('map.creditOsm')}</p>
+            {!sharingMode && (
+              <div className="mt-3">
+                <KeyHelp service="google" variant="compact" />
+              </div>
+            )}
           </motion.section>
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+/** Google Maps search for the category around a point: a way out when OSM is down or empty. */
+const googleSearchUrl = (term: string, c: { lat: number; lng: number }) => `https://www.google.com/maps/search/${encodeURIComponent(term)}/@${c.lat.toFixed(5)},${c.lng.toFixed(5)},14z`
+
+function GoogleLink({ filter, coords }: { filter: PlaceFilter; coords: { lat: number; lng: number } }) {
+  const { t } = useTranslation()
+  return (
+    <a
+      href={googleSearchUrl(filter === 'scout' ? t('kind.restaurant') : t(`map.filter.${filter}`), coords)}
+      target="_blank"
+      rel="noopener"
+      className="inline-flex items-center gap-1.5 rounded-full bg-veil/[0.06] px-4 py-2 text-xs font-medium text-fog-100"
+    >
+      {t('map.openGoogle')} <ExternalLink size={12} />
+    </a>
+  )
+}
+
+function PlacesError({ filter, coords, online, timeout, onRetry }: { filter: PlaceFilter; coords: { lat: number; lng: number }; online: boolean; timeout: boolean; onRetry: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <div className="card p-4 text-center" role="alert">
+      <p className="text-sm font-medium text-fog-100">{t('map.errorTitle')}</p>
+      <p className="mt-1 text-xs text-fog-400">{!online ? t('map.needsConnection') : timeout ? t('map.errorTimeout') : t('map.loadFailed')}</p>
+      <div className="mt-3 flex flex-wrap justify-center gap-2">
+        <button onClick={onRetry} className="inline-flex items-center gap-1.5 rounded-full bg-fog-100 px-4 py-2 text-xs font-medium text-ink-900">
+          <RefreshCw size={13} /> {t('map.retry')}
+        </button>
+        <GoogleLink filter={filter} coords={coords} />
+      </div>
+    </div>
+  )
+}
+
+function PlacesEmpty({ filter, coords, radius }: { filter: PlaceFilter; coords: { lat: number; lng: number }; radius: number }) {
+  const { t } = useTranslation()
+  const wider = RADII.find((r) => r > radius)
+  return (
+    <div className="card p-4 text-center">
+      <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-veil/[0.06] text-fog-400">
+        <SearchX size={20} />
+      </span>
+      <p className="mt-3 text-sm font-medium text-fog-100">{t('map.emptyTitle', { what: t(`map.what.${filter}`), radius: fmtDistance(radius) })}</p>
+      <p className="mt-1 text-xs text-fog-400">{wider ? t('map.emptyWiden', { radius: fmtDistance(wider) }) : t('map.emptyOther')}</p>
+      <div className="mt-3 flex flex-wrap justify-center gap-2">
+        {wider && (
+          <button onClick={() => settings.set({ scoutRadius: wider })} className="rounded-full bg-fog-100 px-4 py-2 text-xs font-medium text-ink-900">
+            {t('map.searchWider', { radius: fmtDistance(wider) })}
+          </button>
+        )}
+        <GoogleLink filter={filter} coords={coords} />
+      </div>
+    </div>
+  )
+}
+
+function PlaceList({ list, pick, onSelect }: { list: RankedPlace[]; pick?: RankedPlace; onSelect: (p: RankedPlace) => void }) {
+  return (
+    <ul className="space-y-1.5">
+      {list.slice(0, 15).map((p, i) => (
+        <PlaceRow key={p.id} place={p} pick={i === 0 && Boolean(pick)} onClick={() => onSelect(p)} />
+      ))}
+    </ul>
   )
 }
 
