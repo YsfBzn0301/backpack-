@@ -24,6 +24,8 @@ export interface Line {
   name: string
   mode: Mode
   product?: string
+  /** Train/trip number, e.g. 59094 for an RB16 run. */
+  number?: string
 }
 
 export interface Remark {
@@ -66,8 +68,12 @@ export interface Leg {
 export interface Journey {
   id: string
   legs: Leg[]
+  /** First vehicle departure (what timetables and DB show). */
   departure: number
+  /** Last vehicle arrival. */
   arrival: number
+  /** When to start walking, if the trip begins with a real walk. */
+  leaveAt?: number
   transfers: number
   price?: { amount: number; currency: string }
 }
@@ -78,6 +84,8 @@ export interface Place {
   lat?: number
   lng?: number
   kind: 'stop' | 'address' | 'poi'
+  /** The traveller's current location rather than a fixed place. */
+  here?: boolean
 }
 
 const MODE: Record<string, Mode> = {
@@ -218,6 +226,7 @@ export async function departures(stopId: string, signal?: AbortSignal): Promise<
     tripId: string
     routeShortName?: string
     displayName?: string
+    tripShortName?: string
     cancelled?: boolean
     tripCancelled?: boolean
     pickupDropoffType?: string
@@ -237,7 +246,10 @@ export async function departures(stopId: string, signal?: AbortSignal): Promise<
           platform: d.place.track || undefined,
           plannedPlatform: d.place.scheduledTrack || undefined,
           direction: d.headsign || d.tripTo?.name || '',
-          line: { name: d.displayName || d.routeShortName || '?', mode: modeOf(d.mode) },
+          line: (() => {
+            const l = lineName(d)
+            return l.name ? l : { ...l, name: '?' }
+          })(),
           cancelled: Boolean(d.cancelled || d.tripCancelled || d.place.cancelled),
           remarks: remarksOf(d.place.alerts),
         }
@@ -261,6 +273,15 @@ export async function searchLocations(query: string, near?: { lat: number; lng: 
   })
 }
 
+const isStationWalk = (l: Leg) => (l.distance ?? 0) < 60 || l.origin === l.destination
+
+/** "RB16" as the badge, the run number (59094) kept separately. */
+function lineName(l: { mode: string; routeShortName?: string; displayName?: string; tripShortName?: string }): Line {
+  const name = l.routeShortName?.trim() || l.displayName?.replace(/\s*\(\d+\)$/, '').trim() || ''
+  const num = l.tripShortName?.trim() || l.displayName?.match(/\((\d+)\)$/)?.[1]
+  return { name, mode: modeOf(l.mode), number: num && num !== name ? num : undefined }
+}
+
 const placeParam = (p: Place) => p.id ?? `${p.lat},${p.lng}`
 
 export async function journeys(from: Place, to: Place, departure: Date, signal?: AbortSignal): Promise<Journey[]> {
@@ -277,13 +298,14 @@ export async function journeys(from: Place, to: Place, departure: Date, signal?:
     headsign?: string
     routeShortName?: string
     displayName?: string
+    tripShortName?: string
     cancelled?: boolean
     alerts?: RawAlert[]
   }
   type Raw = { itineraries?: { id?: string; startTime: string; endTime: string; transfers: number; legs: RawLeg[] }[] }
   const r = await versioned<Raw>('plan', ['v5', 'v6', 'v4', 'v3'], { fromPlace: placeParam(from), toPlace: placeParam(to), time: departure.toISOString(), numItineraries: 5, language: lang() }, signal)
   return (r.itineraries ?? []).map((j, i) => {
-    const legs: Leg[] = j.legs.map((l) => {
+    const all: Leg[] = j.legs.map((l) => {
       const walking = ['WALK', 'BIKE', 'CAR', 'RENTAL'].includes(l.mode)
       return {
         origin: l.from.name === 'START' ? from.name : l.from.name,
@@ -296,7 +318,7 @@ export async function journeys(from: Place, to: Place, departure: Date, signal?:
         plannedArrival: ms(l.scheduledEndTime) ?? ms(l.endTime)!,
         arrivalDelayMin: l.realTime ? minutesLate(l.endTime, l.scheduledEndTime) : null,
         arrivalPlatform: l.to.track || l.to.scheduledTrack || undefined,
-        line: walking ? undefined : { name: l.displayName || l.routeShortName || '', mode: modeOf(l.mode) },
+        line: walking ? undefined : lineName(l),
         direction: l.headsign,
         walking,
         distance: l.distance,
@@ -304,11 +326,17 @@ export async function journeys(from: Place, to: Place, departure: Date, signal?:
         remarks: remarksOf(l.alerts),
       }
     })
+    // MOTIS adds short walks inside a station (stop → platform) to the
+    // itinerary; they shift the start time and aren't real walks.
+    const legs = all.filter((l) => !l.walking || !isStationWalk(l))
+    const rides = legs.filter((l) => !l.walking)
+    const lead = legs[0]?.walking ? legs[0] : undefined
     return {
       id: j.id ?? `${i}-${j.startTime}`,
-      legs,
-      departure: ms(j.startTime)!,
-      arrival: ms(j.endTime)!,
+      legs: legs.length ? legs : all,
+      departure: rides[0]?.departure ?? ms(j.startTime)!,
+      arrival: rides.at(-1)?.arrival ?? ms(j.endTime)!,
+      leaveAt: lead && rides.length ? lead.departure : undefined,
       transfers: j.transfers,
     }
   })

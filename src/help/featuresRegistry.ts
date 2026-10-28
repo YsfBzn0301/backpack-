@@ -123,7 +123,7 @@ export const featuresRegistry: FeatureEntry[] = [
     color: '#3fa34d',
     demo: 'transit',
     open: { tab: 'transit' },
-    fallback: { title: 'Public transit', summary: 'Live departures and routes for trains, S-Bahn, U-Bahn, trams, buses and ferries.', steps: ['Departures shows the stations around you.', 'Delays, platform changes and cancellations are highlighted.', 'Route plans a trip; Google Transit covers other regions.'] },
+    fallback: { title: 'Public transit', summary: 'Live departures and routes for trains, S-Bahn, U-Bahn, trams, buses and ferries.', steps: ['Departures shows the stations around you.', 'Delays, platform changes and cancellations are highlighted.', 'Route plans a trip. Save it to see the next live connections at a glance; remove it with the bin icon.'] },
   },
   {
     id: 'converter',

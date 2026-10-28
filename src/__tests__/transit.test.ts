@@ -94,3 +94,45 @@ describe('transit (Transitous)', () => {
     expect(j.legs[1]).toMatchObject({ walking: false, departureDelayMin: 1, departurePlatform: '3', line: { name: 'S7', mode: 'suburban' }, direction: 'Potsdam' })
   })
 })
+
+describe('journey times', () => {
+  it('uses the train times, not an in-station walk, and splits the run number', async () => {
+    mockFetch(() =>
+      json({
+        itineraries: [
+          {
+            startTime: '2026-10-28T11:29:00Z',
+            endTime: '2026-10-28T12:19:00Z',
+            transfers: 0,
+            legs: [
+              { mode: 'WALK', from: { name: 'Ingolstadt Nord', lat: 0, lon: 0 }, to: { name: 'Ingolstadt Nord', lat: 0, lon: 0 }, startTime: '2026-10-28T11:29:00Z', endTime: '2026-10-28T11:34:00Z', scheduledStartTime: '2026-10-28T11:29:00Z', scheduledEndTime: '2026-10-28T11:34:00Z', realTime: false, distance: 0 },
+              { mode: 'REGIONAL_RAIL', from: { name: 'Ingolstadt Nord', lat: 0, lon: 0, track: '1' }, to: { name: 'Treuchtlingen', lat: 0, lon: 0 }, startTime: '2026-10-28T11:34:00Z', endTime: '2026-10-28T12:19:00Z', scheduledStartTime: '2026-10-28T11:34:00Z', scheduledEndTime: '2026-10-28T12:19:00Z', realTime: true, displayName: 'RB16 (59094)', routeShortName: 'RB16', tripShortName: '59094' },
+            ],
+          },
+        ],
+      }),
+    )
+    const [j] = await journeys({ id: 'IN', name: 'Ingolstadt Nord', kind: 'stop' }, { id: 'TR', name: 'Treuchtlingen', kind: 'stop' }, new Date())
+    expect(new Date(j.departure).toISOString()).toBe('2026-10-28T11:34:00.000Z')
+    expect(new Date(j.arrival).toISOString()).toBe('2026-10-28T12:19:00.000Z')
+    expect(j.leaveAt).toBeUndefined()
+    expect(j.legs).toHaveLength(1)
+    expect(j.legs[0].line).toMatchObject({ name: 'RB16', number: '59094', mode: 'regional' })
+  })
+})
+
+describe('saved routes', () => {
+  it('saves once per from/to pair, keeps "my location" dynamic, and removes', async () => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    const { savedRoutes, saveRoute, removeRoute, isSaved, routeId } = await import('@/lib/savedRoutes')
+    const here = { name: 'My location', lat: 48.77, lng: 11.43, kind: 'address' as const, here: true }
+    const to = { id: 'TR', name: 'Treuchtlingen', kind: 'stop' as const }
+    saveRoute(here, to)
+    saveRoute({ ...here, lat: 49.0 }, to)
+    expect(savedRoutes.get().list).toHaveLength(1)
+    expect(savedRoutes.get().list[0].from).toBeNull()
+    expect(isSaved(savedRoutes.get().list, null, to)).toBe(true)
+    removeRoute(routeId(null, to))
+    expect(savedRoutes.get().list).toHaveLength(0)
+  })
+})

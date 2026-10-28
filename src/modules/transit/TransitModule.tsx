@@ -3,13 +3,14 @@
  * journey planner, via Transitous (open data). Google Transit is the fallback.
  */
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, ArrowDownUp, ChevronDown, ExternalLink, Footprints, Loader2, MapPin, RefreshCw, Search, TramFront, X } from 'lucide-react'
+import { AlertTriangle, ArrowDownUp, ArrowRight, Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Footprints, Loader2, MapPin, RefreshCw, Search, Trash2, TramFront, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { activeCoords, location } from '@/lib/location'
 import { createStore } from '@/lib/store'
 import { haptic } from '@/lib/haptics'
+import { isSaved, removeRoute, routeId, saveRoute, savedRoutes, type SavedRoute } from '@/lib/savedRoutes'
 import { fmtClock, fmtDistance, fmtDuration, fmtMoney, relativeTime } from '@/i18n/format'
 import { departures, googleJourneys, googleTransitUrl, journeys, nearbyStops, searchLocations, type Departure, type Journey, type Leg, type Line, type Mode, type Place, type Stop } from '@/services/transit'
 import { useMapsLoader } from '@/hooks/useMapsLoader'
@@ -266,7 +267,7 @@ function PlaceInput({ label, value, onPick, near, allowHere }: { label: string; 
           {allowHere && near && (
             <li>
               <button
-                onMouseDown={() => onPick({ name: t('transit.myLocation'), lat: near.lat, lng: near.lng, kind: 'address' })}
+                onMouseDown={() => onPick({ name: t('transit.myLocation'), lat: near.lat, lng: near.lng, kind: 'address', here: true })}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ember-400 hover:bg-veil/5"
               >
                 <MapPin size={13} /> {t('transit.myLocation')}
@@ -302,7 +303,9 @@ function RoutePlanner() {
   const [to, setTo] = useState<Place | null>(null)
   const [when, setWhen] = useState<string>('')
   const [submitted, setSubmitted] = useState(0)
-  const origin = from ?? (coords ? { name: t('transit.myLocation'), lat: coords.lat, lng: coords.lng, kind: 'address' as const } : null)
+  const origin = from?.here && coords ? { ...from, lat: coords.lat, lng: coords.lng } : (from ?? (coords ? { name: t('transit.myLocation'), lat: coords.lat, lng: coords.lng, kind: 'address' as const, here: true } : null))
+  const saved = savedRoutes.use((s) => s.list)
+  const isFav = Boolean(to && isSaved(saved, origin, to))
   const results = useQuery({
     queryKey: ['transit-journeys', origin?.id ?? `${origin?.lat},${origin?.lng}`, to?.id ?? to?.name, when, submitted, maps],
     enabled: Boolean(origin && to && submitted),
@@ -323,8 +326,17 @@ function RoutePlanner() {
     retry: 0,
   })
 
+  const openSaved = (r: SavedRoute) => {
+    haptic('select')
+    setFrom(r.from)
+    setTo(r.to)
+    setWhen('')
+    setSubmitted(Date.now())
+  }
+
   return (
     <div className="space-y-3">
+      {saved.length > 0 && <SavedRoutes list={saved} onOpen={openSaved} />}
       <section className="card space-y-2 p-3">
         <PlaceInput label={t('transit.from')} value={from} onPick={setFrom} near={coords ?? undefined} allowHere />
         <div className="relative">
@@ -361,7 +373,23 @@ function RoutePlanner() {
             <Search size={14} /> {t('transit.find')}
           </button>
         </div>
-        {!when && <p className="px-1 text-[10px] text-fog-500">{t('transit.departNow')}</p>}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <p className="text-[10px] text-fog-500">{!when && t('transit.departNow')}</p>
+          {origin && to && (
+            <button
+              onClick={() => {
+                haptic(isFav ? 'select' : 'success')
+                if (isFav) removeRoute(routeId(origin, to))
+                else saveRoute(origin, to)
+              }}
+              aria-pressed={isFav}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${isFav ? 'bg-ember-500/15 text-ember-400' : 'bg-veil/[0.05] text-fog-300'}`}
+            >
+              {isFav ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
+              {isFav ? t('transit.routeSaved') : t('transit.saveRoute')}
+            </button>
+          )}
+        </div>
       </section>
 
       {results.isFetching ? (
@@ -428,6 +456,11 @@ function JourneyCard({ j }: { j: Journey }) {
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fog-500">
           <span>{t('transit.transfers', { count: j.transfers })}</span>
+          {j.leaveAt != null && (
+            <span className="flex items-center gap-1">
+              <Footprints size={11} /> {t('transit.leaveAt', { time: fmtClock(new Date(j.leaveAt)), dur: fmtDuration(Math.max(1, Math.round((j.departure - j.leaveAt) / 60_000))) })}
+            </span>
+          )}
           {first?.departurePlatform && <span>{t('transit.fromPlatform', { p: first.departurePlatform })}</span>}
           {j.price && <span>{fmtMoney(j.price.amount, j.price.currency)}</span>}
           {issues && (
@@ -465,6 +498,7 @@ function LegRow({ l }: { l: Leg }) {
       <div className="flex items-center gap-2">
         {l.line && <LineBadge line={l.line} />}
         <span className="truncate text-xs text-fog-400">{l.direction}</span>
+        {l.line?.number && <span className="tabular shrink-0 text-[10px] text-fog-500">{l.line.number}</span>}
       </div>
       <div className="mt-1.5 grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1 text-xs">
         <span className="tabular text-fog-50">{fmtClock(new Date(l.plannedDeparture))}</span>
@@ -485,6 +519,104 @@ function LegRow({ l }: { l: Leg }) {
           {r.text}
         </p>
       ))}
+    </li>
+  )
+}
+
+function SavedRoutes({ list, onOpen }: { list: SavedRoute[]; onOpen: (r: SavedRoute) => void }) {
+  const { t } = useTranslation()
+  return (
+    <section aria-label={t('transit.savedRoutes')} className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3 px-1">
+        <h2 className="shrink-0 text-xs font-semibold tracking-wide text-fog-300 uppercase">{t('transit.savedRoutes')}</h2>
+        <span className="min-w-0 truncate text-[10px] text-fog-500">{t('transit.savedLive')}</span>
+      </div>
+      <ul className="space-y-2">
+        {list.map((r) => (
+          <SavedRouteCard key={r.id} r={r} onOpen={() => onOpen(r)} />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function SavedRouteCard({ r, onOpen }: { r: SavedRoute; onOpen: () => void }) {
+  const { t } = useTranslation()
+  const loc = location.use()
+  const { coords } = activeCoords(loc)
+  const origin: Place | null = r.from ?? (coords ? { name: t('transit.myLocation'), lat: coords.lat, lng: coords.lng, kind: 'address', here: true } : null)
+  const q = useQuery({
+    queryKey: ['saved-route', r.id, r.from ? '' : `${coords?.lat.toFixed(3)},${coords?.lng.toFixed(3)}`],
+    queryFn: ({ signal }) => journeys(origin!, r.to, new Date(Date.now() - 60_000), signal),
+    enabled: Boolean(origin),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    retry: 1,
+  })
+  const now = Date.now()
+  const next = (q.data ?? []).filter((j) => j.departure >= now - 60_000).slice(0, 3)
+  return (
+    <li className="card overflow-hidden">
+      <div className="flex items-center gap-2 px-3.5 pt-3">
+        <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm font-semibold text-fog-50">
+          <span className="truncate">{origin?.name ?? t('transit.myLocation')}</span>
+          <ArrowRight size={13} className="shrink-0 text-fog-500" />
+          <span className="truncate">{r.to.name}</span>
+        </button>
+        {q.isFetching && <Loader2 size={13} className="shrink-0 animate-spin text-fog-500" />}
+        <button
+          onClick={() => {
+            haptic('warn')
+            removeRoute(r.id)
+          }}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-fog-500 hover:bg-veil/5 hover:text-alert-500"
+          aria-label={t('transit.removeRoute')}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+      {q.isLoading ? (
+        <div className="mx-3.5 my-3 h-12 animate-pulse rounded-lg bg-veil/[0.04]" />
+      ) : q.isError && !q.data ? (
+        <p className="px-3.5 py-3 text-xs text-fog-500">{t('transit.savedFailed')}</p>
+      ) : next.length === 0 ? (
+        <p className="px-3.5 py-3 text-xs text-fog-500">{t('transit.noUpcoming')}</p>
+      ) : (
+        <ol className="mt-1 divide-y divide-veil/5">
+          {next.map((j) => {
+            const first = j.legs.find((l) => !l.walking)
+            const cancelled = j.legs.some((l) => l.cancelled)
+            const late = first?.departureDelayMin ?? null
+            const mins = Math.max(0, Math.round((j.departure - now) / 60_000))
+            return (
+              <li key={j.id}>
+                <button onClick={onOpen} className="flex w-full items-center gap-3 px-3.5 py-2 text-left">
+                  <span className={`tabular w-24 shrink-0 text-sm ${cancelled ? 'text-fog-500 line-through' : 'text-fog-50'}`}>
+                    {fmtClock(new Date(j.departure))} → {fmtClock(new Date(j.arrival))}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                    {j.legs
+                      .filter((l) => !l.walking && l.line)
+                      .map((l, i) => (
+                        <LineBadge key={i} line={l.line!} />
+                      ))}
+                  </span>
+                  <span className="shrink-0 text-right text-[11px]">
+                    {cancelled ? (
+                      <span className="font-medium text-alert-500">{t('transit.cancelled')}</span>
+                    ) : (
+                      <>
+                        <span className="block text-fog-300">{mins === 0 ? t('transit.now') : mins < 60 ? t('transit.inMin', { n: mins }) : fmtDuration(mins)}</span>
+                        <Delay min={late} />
+                      </>
+                    )}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+      )}
     </li>
   )
 }
