@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ui } from '@/lib/ui'
 import { haptic } from '@/lib/haptics'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 interface Shot {
   id: string
@@ -65,6 +66,7 @@ function shutterSound() {
 }
 
 export function CameraScreen() {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const open = ui.use((s) => s.cameraOpen)
   const video = useRef<HTMLVideoElement>(null)
@@ -282,7 +284,7 @@ export function CameraScreen() {
                 <div className="flex-1 overflow-hidden p-3">
                   <img src={review.url} alt="" className="h-full w-full rounded-2xl object-contain" />
                 </div>
-                <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-3">
+                <div ref={fadeRef} className="scroll-fade no-scrollbar flex gap-2 overflow-x-auto px-4 pb-3">
                   {shots.map((s) => (
                     <button key={s.id} onClick={() => setReview(s)} className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg ${s.id === review.id ? 'ring-2 ring-white' : 'opacity-60'}`}>
                       <img src={s.url} alt="" className="h-full w-full object-cover" />

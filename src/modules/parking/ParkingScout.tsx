@@ -51,6 +51,7 @@ import type { Overlay } from '@/modules/map/TileMap'
 import { UserDot } from '@/modules/map/Marker'
 import { NeedLocation, RadiusToggle } from '@/modules/map/MapModule'
 import { RoadRulesCard } from './RoadRulesCard'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 type Filter = 'freeNow' | 'ev' | 'accessible' | 'covered' | 'live'
 const STAYS = [30, 60, 120, 240, 480, 1440]
@@ -64,6 +65,7 @@ interface Row {
 }
 
 export function ParkingScout() {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const loc = location.use()
   const { coords } = activeCoords(loc)
@@ -157,7 +159,7 @@ export function ParkingScout() {
             </button>
           </div>
         </div>
-        <div className="no-scrollbar -mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1" data-no-swipe>
+        <div ref={fadeRef} className="scroll-fade no-scrollbar -mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1" data-no-swipe>
           {(['freeNow', 'live', 'ev', 'accessible', 'covered'] as Filter[]).map((f) => (
             <Pressable
               key={f}

@@ -10,11 +10,13 @@ import { fmtClock, fmtDate, fmtTemp, loc, relativeTime } from '@/i18n/format'
 import { tx } from '@/i18n'
 import { useNow } from '@/hooks/useNow'
 import { settings } from '@/lib/settings'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 /** Open-Meteo gives WMO codes (translated here); OpenWeather sends localised text. */
 export const weatherText = (w: Pick<Weather, 'wmoCode' | 'description'>) => (w.wmoCode != null ? tx(`wmo.${w.wmoCode}`) : w.description)
 
 export function WeatherCard({ query, placeName, onLocate }: { query: UseQueryResult<Weather>; placeName: string; onLocate: () => void }) {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const w = query.data
   const now = useNow(30_000)
@@ -58,7 +60,7 @@ export function WeatherCard({ query, placeName, onLocate }: { query: UseQueryRes
               />
             </div>
             {w.daily.length > 1 && (
-              <div className="no-scrollbar mt-4 -mx-1 flex gap-1 overflow-x-auto" data-no-swipe>
+              <div ref={fadeRef} className="scroll-fade no-scrollbar mt-4 -mx-1 flex gap-1 overflow-x-auto" data-no-swipe>
                 {w.daily.slice(0, 6).map((d, i) => (
                   <div key={d.date} className="flex min-w-[52px] flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px]">
                     <span className="text-fog-500">{i === 0 ? t('weather.today') : fmtDate(new Date(d.date + 'T12:00:00'), { weekday: 'short' })}</span>

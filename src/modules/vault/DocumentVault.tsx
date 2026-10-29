@@ -6,6 +6,7 @@ import { haptic } from '@/lib/haptics'
 import { relativeTime } from '@/i18n/format'
 import { useTranslation } from 'react-i18next'
 import { Pressable } from '@/components/ui/Pressable'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 const LABELS: DocLabel[] = ['passport', 'visa', 'insurance', 'booking', 'other']
 const AUTO_LOCK_MS = 5 * 60_000
@@ -204,13 +205,14 @@ function Unlock({ setUp, onKey }: { setUp: boolean; onKey: (k: CryptoKey) => voi
 }
 
 function AddDoc({ onAdd }: { onAdd: (file: File, label: DocLabel) => Promise<void> }) {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const input = useRef<HTMLInputElement>(null)
   const [label, setLabel] = useState<DocLabel>('passport')
   const [busy, setBusy] = useState(false)
   return (
     <div className="card p-3">
-      <div className="no-scrollbar flex gap-1.5 overflow-x-auto" data-no-swipe>
+      <div ref={fadeRef} className="scroll-fade no-scrollbar flex gap-1.5 overflow-x-auto" data-no-swipe>
         {LABELS.map((l) => (
           <button key={l} onClick={() => setLabel(l)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${label === l ? 'bg-fog-100 text-ink-900' : 'bg-veil/5 text-fog-400'}`}>
             {t(`vault.label.${l}`)}

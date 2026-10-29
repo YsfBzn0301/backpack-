@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useId } from 'react'
 import { haptic } from '@/lib/haptics'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 interface Props<T extends string> {
   value: T
@@ -13,8 +14,9 @@ interface Props<T extends string> {
 
 export function Segmented<T extends string>({ value, options, onChange, size = 'md', stretch = false }: Props<T>) {
   const id = useId()
+  const fadeRef = useScrollFade()
   return (
-    <div className="no-scrollbar flex gap-1 overflow-x-auto rounded-full bg-ink-850 p-1 hairline border">
+    <div ref={fadeRef} className="scroll-fade no-scrollbar flex gap-1 overflow-x-auto rounded-full bg-ink-850 p-1 hairline border">
       {options.map((o) => (
         <button
           key={o.value}

@@ -6,8 +6,10 @@ import { SectionTitle } from '@/components/ui/SectionTitle'
 import { directionsUrl, walkMinutes } from '@/lib/geo'
 import { cap, fmtDistance } from '@/i18n/format'
 import { goTab } from '@/lib/ui'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 export function ScoutPicks() {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const scout = useAgentState<ScoutState>('scout')
   const picks = scout?.picks.slice(0, 5) ?? []
@@ -23,7 +25,7 @@ export function ScoutPicks() {
       >
         {t('picks.title', { intents: scout?.intents.map((i) => t(`intent.${i.id}`)).join(', ') })}
       </SectionTitle>
-      <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1" data-no-swipe>
+      <div ref={fadeRef} className="scroll-fade no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1" data-no-swipe>
         {picks.map((p) => (
           <a key={p.id} href={directionsUrl(p, 'walking', p.source === 'google' ? p.id : undefined)} target="_blank" rel="noopener" className="card w-56 shrink-0 snap-start p-3.5 transition-transform active:scale-[0.98]">
             <div className="flex items-center justify-between text-[11px] text-fog-500">

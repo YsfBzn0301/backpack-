@@ -24,6 +24,7 @@ import { SHARING_MAX_RADIUS } from '@/services/sharing'
 import { SHARING_COLOR, SharingList, sharingOverlays, sharingShapes, SkeletonRows, useSharing } from './SharingLayer'
 import { PlaceMarker, UserDot } from './Marker'
 import { KIND_STYLE } from './kindStyle'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 const ParkingScout = lazy(() => import('@/modules/parking/ParkingScout').then((m) => ({ default: m.ParkingScout })))
 
@@ -121,6 +122,7 @@ export function MapModule() {
 }
 
 function PlacesView() {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const loc = location.use()
   const { coords, source } = activeCoords(loc)
@@ -276,7 +278,7 @@ function PlacesView() {
         ) : null}
       </form>
 
-      <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4" data-no-swipe>
+      <div ref={fadeRef} className="scroll-fade no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4" data-no-swipe>
         {FILTERS.map((f) => {
           const active = filter === f && !searchResults
           return (

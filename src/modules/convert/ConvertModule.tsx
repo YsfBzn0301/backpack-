@@ -18,12 +18,14 @@ import { Pressable } from '@/components/ui/Pressable'
 import { SectionTitle } from '@/components/ui/SectionTitle'
 import { CurrencyPicker } from './CurrencyPicker'
 import { Numpad } from './Numpad'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 const pair = createStore({ from: '', to: '', userPicked: false }, 'backpack:fx-pair')
 
 const TIPS = [0, 10, 15, 20]
 
 export function ConvertModule() {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const render = useMsg()
   const { fx, convert, syncing, refresh, localCurrency, error } = useExchangeRates()
@@ -116,7 +118,7 @@ export function ConvertModule() {
 
       <KeyHelp service="oxr" variant="compact" />
 
-      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto" data-no-swipe>
+      <div ref={fadeRef} className="scroll-fade no-scrollbar flex items-center gap-2 overflow-x-auto" data-no-swipe>
         {TIPS.map((tp) => (
           <Chip key={tp} active={tip === tp} onClick={() => setTip(tp)}>
             {tp === 0 ? t('money.noTip') : `+${tp}%`}

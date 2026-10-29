@@ -12,6 +12,7 @@ import { closeHelp, goTab, openScreen, ui } from '@/lib/ui'
 import { haptic } from '@/lib/haptics'
 import { FEATURE_GROUPS, featuresRegistry, type FeatureEntry, type FeatureGroup, type OpenTarget } from './featuresRegistry'
 import { HelpDemo } from './HelpDemos'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 /** Localised text with the registry's English fallback for untranslated entries. */
 export function featureText(f: FeatureEntry) {
@@ -37,6 +38,7 @@ function openTarget(target: OpenTarget) {
 }
 
 export function FeatureHelpCenter() {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const focus = ui.use((s) => s.helpFocus)
   const [q, setQ] = useState('')
@@ -70,7 +72,7 @@ export function FeatureHelpCenter() {
             <Search size={16} className="text-fog-500" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('help.search')} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-fog-500" />
           </label>
-          <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4">
+          <div ref={fadeRef} className="scroll-fade no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4">
             {(['all', ...FEATURE_GROUPS] as const).map((g) => (
               <button key={g} onClick={() => setGroup(g)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${group === g ? 'bg-fog-100 text-ink-900' : 'bg-veil/[0.05] text-fog-400'}`}>
                 {t(`help.group.${g}`)}

@@ -22,8 +22,8 @@ export function Header({ utcOffsetSec, placeName }: { utcOffsetSec?: number; pla
 
   return (
     <header className="safe-top sticky top-0 z-30 px-4 pb-2">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-full bg-gradient-to-b from-ink-900 via-ink-900/90 to-transparent" />
-      <div className="glass flex items-center gap-1.5 rounded-full py-1.5 pr-1.5 pl-1.5">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-full bg-gradient-to-b from-ink-900 via-ink-900/95 to-transparent md:via-ink-900/90" />
+      <div className="header-solid flex items-center gap-1.5 rounded-full py-1.5 pr-1.5 pl-1.5">
         <button
           onClick={() => ui.set({ searchOpen: true })}
           className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2.5 py-1 text-left hover:bg-veil/5"

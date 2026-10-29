@@ -124,6 +124,41 @@
   border: 1px solid color-mix(in oklab, var(--color-fog-100) 10%, transparent);
 }
 
+/* Mobile header: no backdrop-filter, near-opaque, crisp hairline. */
+@utility header-solid {
+  background: color-mix(in oklab, var(--color-ink-800) 96%, transparent);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid color-mix(in oklab, var(--color-fog-100) 12%, transparent);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18), 0 6px 14px -10px rgba(0, 0, 0, 0.5);
+  :root[data-theme='light'] & {
+    border-color: rgba(13, 17, 23, 0.1);
+    box-shadow: 0 1px 2px rgba(13, 17, 23, 0.06), 0 6px 14px -10px rgba(13, 17, 23, 0.22);
+  }
+  @media (min-width: 48rem) {
+    background: color-mix(in oklab, var(--color-ink-800) 90%, transparent);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border-color: color-mix(in oklab, var(--color-fog-100) 8%, transparent);
+    box-shadow: none;
+  }
+}
+
+/* Horizontal scroll cue: edge fade that hides at the ends (see useScrollFade). */
+@utility scroll-fade {
+  --fade-size: 32px;
+  --fade-l: var(--fade-size);
+  --fade-r: var(--fade-size);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+  &[data-at-start] {
+    --fade-l: 0px;
+  }
+  &[data-at-end] {
+    --fade-r: 0px;
+  }
+}
+
 @utility card {
   border-radius: var(--radius-card);
   background: linear-gradient(180deg, color-mix(in oklab, var(--color-ink-800) 92%, white 2%), var(--color-ink-800));

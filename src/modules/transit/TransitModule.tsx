@@ -18,6 +18,7 @@ import { useOnline } from '@/hooks/useOnline'
 import { Segmented } from '@/components/ui/Segmented'
 import { Pressable } from '@/components/ui/Pressable'
 import { NeedLocation } from '@/modules/map/MapModule'
+import { useScrollFade } from '@/hooks/useScrollFade'
 
 const MODE_STYLE: Record<Mode, { bg: string; fg: string }> = {
   express: { bg: '#e6edf3', fg: '#0d1117' },
@@ -75,6 +76,7 @@ export function TransitModule() {
 }
 
 function Board() {
+  const fadeRef = useScrollFade()
   const { t } = useTranslation()
   const loc = location.use()
   const { coords } = activeCoords(loc)
@@ -108,7 +110,7 @@ function Board() {
 
   return (
     <div className="space-y-3">
-      <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4" data-no-swipe>
+      <div ref={fadeRef} className="scroll-fade no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4" data-no-swipe>
         {stops.data.slice(0, 8).map((s) => (
           <StopChip key={s.id} stop={s} active={s.id === stopId} onClick={() => view.set({ stopId: s.id })} />
         ))}
