@@ -432,6 +432,8 @@ const ru: Messages = {
     transfers_many: '{{count}} пересадок',
     transfers_other: '{{count}} пересадки',
     fromPlatform: 'с пути {{p}}',
+    toPlatform: 'на путь {{p}}',
+    platformChanged: 'смена пути',
     arrivesLate: 'прибытие +{{n}} мин',
     walk: 'Пешком {{dist}} · {{dur}}',
     offline: 'Для транспорта нужно подключение. Последние табло сохранены.',

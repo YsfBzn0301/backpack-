@@ -431,6 +431,8 @@ const en = {
     transfers_many: '{{count}} changes',
     transfers_other: '{{count}} changes',
     fromPlatform: 'from platform {{p}}',
+    toPlatform: 'arrives platform {{p}}',
+    platformChanged: 'platform changed',
     arrivesLate: 'arrives +{{n}} min',
     walk: 'Walk {{dist}} · {{dur}}',
     offline: 'Transit needs a connection. Recent boards are cached.',

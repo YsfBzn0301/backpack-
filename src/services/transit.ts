@@ -53,10 +53,13 @@ export interface Leg {
   plannedDeparture: number
   departureDelayMin: number | null
   departurePlatform?: string
+  /** Timetabled platform; differs from departurePlatform on a platform change. */
+  plannedDeparturePlatform?: string
   arrival: number
   plannedArrival: number
   arrivalDelayMin: number | null
   arrivalPlatform?: string
+  plannedArrivalPlatform?: string
   line?: Line
   direction?: string
   walking: boolean
@@ -243,7 +246,7 @@ export async function departures(stopId: string, signal?: AbortSignal): Promise<
           when: d.realTime ? ms(d.place.departure) : null,
           plannedWhen: ms(planned) ?? Date.now(),
           delayMin: d.realTime ? minutesLate(d.place.departure, planned) : null,
-          platform: d.place.track || undefined,
+          platform: d.place.track || d.place.scheduledTrack || undefined,
           plannedPlatform: d.place.scheduledTrack || undefined,
           direction: d.headsign || d.tripTo?.name || '',
           line: (() => {
@@ -314,10 +317,12 @@ export async function journeys(from: Place, to: Place, departure: Date, signal?:
         plannedDeparture: ms(l.scheduledStartTime) ?? ms(l.startTime)!,
         departureDelayMin: l.realTime ? minutesLate(l.startTime, l.scheduledStartTime) : null,
         departurePlatform: l.from.track || l.from.scheduledTrack || undefined,
+        plannedDeparturePlatform: l.from.scheduledTrack || undefined,
         arrival: ms(l.endTime)!,
         plannedArrival: ms(l.scheduledEndTime) ?? ms(l.endTime)!,
         arrivalDelayMin: l.realTime ? minutesLate(l.endTime, l.scheduledEndTime) : null,
         arrivalPlatform: l.to.track || l.to.scheduledTrack || undefined,
+        plannedArrivalPlatform: l.to.scheduledTrack || undefined,
         line: walking ? undefined : lineName(l),
         direction: l.headsign,
         walking,

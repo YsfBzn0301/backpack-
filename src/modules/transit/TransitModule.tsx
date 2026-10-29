@@ -44,6 +44,26 @@ export function LineBadge({ line }: { line: Line }) {
   )
 }
 
+/** "Gl. 3", highlighted with the planned platform struck through when it changed. */
+function PlatformTag({ p, planned, prefix }: { p?: string; planned?: string; prefix?: 'from' | 'to' }) {
+  const { t } = useTranslation()
+  if (!p) return null
+  const changed = Boolean(planned && planned !== p)
+  const label = prefix === 'from' ? t('transit.fromPlatform', { p }) : prefix === 'to' ? t('transit.toPlatform', { p }) : t('transit.platform', { p })
+  return (
+    <span className={`whitespace-nowrap ${changed ? 'font-semibold text-amber-glow' : ''}`} title={changed ? t('transit.platformChanged') : undefined}>
+      {label}
+      {changed && (
+        <>
+          {' '}
+          <s className="font-normal opacity-60">{planned}</s>
+          <span className="sr-only"> ({t('transit.platformChanged')})</span>
+        </>
+      )}
+    </span>
+  )
+}
+
 function Delay({ min, cancelled }: { min: number | null; cancelled?: boolean }) {
   const { t } = useTranslation()
   if (cancelled) return <span className="text-[11px] font-semibold text-alert-500">{t('transit.cancelled')}</span>
@@ -463,7 +483,8 @@ function JourneyCard({ j }: { j: Journey }) {
               <Footprints size={11} /> {t('transit.leaveAt', { time: fmtClock(new Date(j.leaveAt)), dur: fmtDuration(Math.max(1, Math.round((j.departure - j.leaveAt) / 60_000))) })}
             </span>
           )}
-          {first?.departurePlatform && <span>{t('transit.fromPlatform', { p: first.departurePlatform })}</span>}
+          <PlatformTag p={first?.departurePlatform} planned={first?.plannedDeparturePlatform} prefix="from" />
+          <PlatformTag p={last?.arrivalPlatform} planned={last?.plannedArrivalPlatform} prefix="to" />
           {j.price && <span>{fmtMoney(j.price.amount, j.price.currency)}</span>}
           {issues && (
             <span className={`flex items-center gap-1 font-medium ${issues === 'cancelled' ? 'text-alert-500' : 'text-amber-glow'}`}>
@@ -507,13 +528,13 @@ function LegRow({ l }: { l: Leg }) {
         <span className="truncate text-fog-300">{l.origin}</span>
         <span className="flex items-center gap-2 text-fog-500">
           <Delay min={l.departureDelayMin} cancelled={l.cancelled} />
-          {l.departurePlatform && t('transit.platform', { p: l.departurePlatform })}
+          <PlatformTag p={l.departurePlatform} planned={l.plannedDeparturePlatform} />
         </span>
         <span className="tabular text-fog-50">{fmtClock(new Date(l.plannedArrival))}</span>
         <span className="truncate text-fog-300">{l.destination}</span>
         <span className="flex items-center gap-2 text-fog-500">
           <Delay min={l.arrivalDelayMin} />
-          {l.arrivalPlatform && t('transit.platform', { p: l.arrivalPlatform })}
+          <PlatformTag p={l.arrivalPlatform} planned={l.plannedArrivalPlatform} />
         </span>
       </div>
       {l.remarks.map((r, i) => (
@@ -588,13 +609,23 @@ function SavedRouteCard({ r, onOpen }: { r: SavedRoute; onOpen: () => void }) {
           {next.map((j) => {
             const first = j.legs.find((l) => !l.walking)
             const cancelled = j.legs.some((l) => l.cancelled)
+            const lastRide = [...j.legs].reverse().find((l) => !l.walking)
             const late = first?.departureDelayMin ?? null
             const mins = Math.max(0, Math.round((j.departure - now) / 60_000))
             return (
               <li key={j.id}>
                 <button onClick={onOpen} className="flex w-full items-center gap-3 px-3.5 py-2 text-left">
-                  <span className={`tabular w-24 shrink-0 text-sm ${cancelled ? 'text-fog-500 line-through' : 'text-fog-50'}`}>
-                    {fmtClock(new Date(j.departure))} → {fmtClock(new Date(j.arrival))}
+                  <span className="w-28 shrink-0">
+                    <span className={`tabular block text-sm ${cancelled ? 'text-fog-500 line-through' : 'text-fog-50'}`}>
+                      {fmtClock(new Date(j.departure))} → {fmtClock(new Date(j.arrival))}
+                    </span>
+                    {(first?.departurePlatform || lastRide?.arrivalPlatform) && (
+                      <span className="mt-0.5 flex flex-wrap gap-x-1 text-[11px] text-fog-400">
+                        {first?.departurePlatform ? <PlatformTag p={first.departurePlatform} planned={first.plannedDeparturePlatform} /> : <span>–</span>}
+                        <span aria-hidden>→</span>
+                        {lastRide?.arrivalPlatform ? <PlatformTag p={lastRide.arrivalPlatform} planned={lastRide.plannedArrivalPlatform} /> : <span>–</span>}
+                      </span>
+                    )}
                   </span>
                   <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                     {j.legs

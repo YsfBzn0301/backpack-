@@ -432,6 +432,8 @@ const tr: Messages = {
     transfers_many: '{{count}} aktarma',
     transfers_other: '{{count}} aktarma',
     fromPlatform: 'kalkış peronu {{p}}',
+    toPlatform: 'varış peronu {{p}}',
+    platformChanged: 'peron değişti',
     arrivesLate: 'varış +{{n}} dk',
     walk: 'Yürüyüş {{dist}} · {{dur}}',
     offline: 'Toplu taşıma için bağlantı gerekiyor. Son tablolar kayıtlı.',

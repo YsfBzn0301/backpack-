@@ -428,6 +428,8 @@ const de: Messages = {
     transfers_many: '{{count}} Umstiege',
     transfers_other: '{{count}} Umstiege',
     fromPlatform: 'ab Gleis {{p}}',
+    toPlatform: 'an Gleis {{p}}',
+    platformChanged: 'Gleiswechsel',
     arrivesLate: 'Ankunft +{{n}} Min.',
     walk: 'Fußweg {{dist}} · {{dur}}',
     offline: 'ÖPNV braucht eine Verbindung. Letzte Abfahrtstafeln sind gespeichert.',
