@@ -205,7 +205,7 @@ export const featuresRegistry: FeatureEntry[] = [
     color: '#5fd39a',
     demo: 'camera',
     open: { overlay: 'camera' },
-    fallback: { title: 'Quick-snap camera', summary: 'Instant camera with torch and grid; save straight to your photos.', steps: ['Open from the dashboard or Kit.', 'Tap the shutter; flip or use the torch.', 'Save to Photos via your phone’s share sheet, or scan prices.'] },
+    fallback: { title: 'Quick-snap camera', summary: 'Instant camera with torch and grid; save straight to your photos.', steps: ['Open from the dashboard or the Kit button.', 'Tap the shutter; flip or use the torch.', 'Save to Photos via your phone’s share sheet, or scan prices.'] },
   },
   {
     id: 'checklist',
@@ -244,7 +244,7 @@ export const featuresRegistry: FeatureEntry[] = [
     demo: 'theme',
     open: { screen: 'settings' },
     offline: true,
-    fallback: { title: 'Language & theme', summary: 'English, Deutsch, Türkçe or Русский, in dark or light mode.', steps: ['Open Kit → Settings.', 'Pick your language.', 'Choose dark, light or follow the system.'] },
+    fallback: { title: 'Language & theme', summary: 'English, Deutsch, Türkçe or Русский, in dark or light mode.', steps: ['Tap the Kit button → Settings.', 'Pick your language.', 'Choose dark, light or follow the system.'] },
   },
   {
     id: 'scoutAgent',

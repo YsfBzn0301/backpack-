@@ -27,7 +27,7 @@ export function UpdatePrompt() {
     <AnimatePresence>
       {show && (
         <motion.div
-          className="fixed inset-x-0 bottom-28 z-[55] flex justify-center px-4"
+          className="fixed inset-x-0 bottom-28 z-[45] flex justify-center px-4"
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 30, opacity: 0 }}

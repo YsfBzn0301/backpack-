@@ -7,6 +7,7 @@ import { useAgentState } from '@/agents/host'
 import type { SafetyState } from '@/agents/safety.worker'
 import { location } from '@/lib/location'
 import { closeScreen, goTab, TABS, ui, type Screen, type Tab } from '@/lib/ui'
+import { swipeTarget } from '@/lib/nav'
 import { useThemeEngine } from '@/lib/theme'
 import { haptic } from '@/lib/haptics'
 import { countryName } from '@/i18n/format'
@@ -18,7 +19,7 @@ import { UpdatePrompt } from '@/components/UpdatePrompt'
 import { LocationSearch } from '@/components/LocationSearch'
 import { HomeModule } from '@/modules/home/HomeModule'
 import { ConvertModule } from '@/modules/convert/ConvertModule'
-import { KitModule } from '@/modules/kit/KitModule'
+import { KitSheet } from '@/modules/kit/KitSheet'
 import { TranslateModule } from '@/modules/translate/TranslateModule'
 import { VaultModule } from '@/modules/vault/VaultModule'
 import { ChecklistModule } from '@/modules/checklist/ChecklistModule'
@@ -52,8 +53,6 @@ function TabContent({ tab, weather, placeName }: { tab: Tab; weather: ReturnType
       return <TransitModule />
     case 'convert':
       return <ConvertModule />
-    case 'kit':
-      return <KitModule />
   }
 }
 
@@ -124,10 +123,10 @@ export default function App() {
     const dx = tt.clientX - s.x
     const dy = tt.clientY - s.y
     if (Math.abs(dx) < 70 || Math.abs(dy) > 60 || Date.now() - s.t > 600) return
-    const i = TABS.indexOf(tab) + (dx < 0 ? 1 : -1)
-    if (i >= 0 && i < TABS.length) {
+    const next = swipeTarget(tab, dx)
+    if (next) {
       haptic('select')
-      goTab(TABS[i])
+      goTab(next)
     }
   }
 
@@ -138,7 +137,8 @@ export default function App() {
       <div className="relative mx-auto min-h-dvh max-w-xl" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[50vh]" style={{ background: 'radial-gradient(80% 60% at 50% 0%, rgba(255,107,74,0.07), transparent 70%)' }} />
         <Header utcOffsetSec={bridge.weather.data?.utcOffsetSec} placeName={placeName} />
-        <main className="px-4 pt-2 pb-32">
+        {/* Clears the tab bar + raised Kit button, plus the home indicator. */}
+        <main className="px-4 pt-2 pb-[calc(8.5rem+env(safe-area-inset-bottom))]">
           <AnimatePresence mode="popLayout" initial={false}>
             {screen ? (
               <motion.div key={`screen-${screen}`} initial={{ x: 60, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 60, opacity: 0 }} transition={{ type: 'spring', stiffness: 420, damping: 40 }}>
@@ -164,6 +164,7 @@ export default function App() {
         </main>
       </div>
       <TabBar />
+      <KitSheet />
       <LocationSearch />
       <SosSheet />
       <ScannerSheet />
